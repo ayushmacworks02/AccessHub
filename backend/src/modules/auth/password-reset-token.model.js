@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const refreshTokenSchema = new mongoose.Schema(
+const passwordResetTokenSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
@@ -16,41 +16,23 @@ const refreshTokenSchema = new mongoose.Schema(
       index: true,
     },
 
-    jti: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true,
-    },
-
-    familyId: {
-      type: String,
-      required: true,
-      index: true,
-    },
-
     expiresAt: {
       type: Date,
       required: true,
     },
 
-    revokedAt: {
+    usedAt: {
       type: Date,
       default: null,
       index: true,
     },
 
-    replacedByToken: {
-      type: String,
-      default: null,
-    },
-
-    createdByIp: {
+    requestedByIp: {
       type: String,
       default: "",
     },
 
-    revokedByIp: {
+    usedByIp: {
       type: String,
       default: "",
     },
@@ -65,10 +47,10 @@ const refreshTokenSchema = new mongoose.Schema(
   }
 );
 
-refreshTokenSchema.index({ user: 1, familyId: 1 });
-refreshTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+passwordResetTokenSchema.index({ user: 1, usedAt: 1 });
+passwordResetTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-export const RefreshToken = mongoose.model(
-  "RefreshToken",
-  refreshTokenSchema
+export const PasswordResetToken = mongoose.model(
+  "PasswordResetToken",
+  passwordResetTokenSchema
 );

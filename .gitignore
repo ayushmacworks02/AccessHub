@@ -1,4 +1,4 @@
-@'
+
 # -----------------------------
 # Dependencies
 # -----------------------------
@@ -99,4 +99,3 @@ desktop.ini
 # -----------------------------
 .nyc_output/
 junit.xml
-'@ | Set-Content -Path ".gitignore"
