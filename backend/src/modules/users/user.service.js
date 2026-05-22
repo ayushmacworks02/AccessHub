@@ -1,12 +1,27 @@
+import crypto from "crypto";
 import mongoose from "mongoose";
+
+import { env } from "../../config/env.js";
 import { ApiError } from "../../utils/api-error.js";
 import { STATUS } from "../../constants/status.js";
 import { SYSTEM_ROLES } from "../../constants/roles.js";
 import { hashPassword } from "../../utils/password.js";
+import { hashToken } from "../../utils/token-hash.js";
+import { getRequestIp, getUserAgent } from "../../utils/request-meta.js";
+
 import { User } from "./user.model.js";
 import { Role } from "../roles/role.model.js";
 import { Department } from "../departments/department.model.js";
+import { PasswordResetToken } from "../auth/password-reset-token.model.js";
 import { createAuditLog } from "../audits/audit.service.js";
+import {
+  buildAccountCreatedEmail,
+  buildPasswordResetEmail,
+} from "../mail/mail.templates.js";
+import {
+  sendAccountCreatedEmail,
+  sendPasswordResetEmail,
+} from "../mail/mail.service.js";
 
 import "../permissions/permission.model.js";
 
@@ -39,6 +54,19 @@ const getRoleSummary = (roles = []) => {
   }));
 };
 
+const isSuperAdminRole = (role) => {
+  return (
+    Boolean(role?.isSystemRole) ||
+    role?.code === SYSTEM_ROLES.SUPER_ADMIN ||
+    role?.code === "SUPER_ADMIN" ||
+    role?.code === "SUPERADMIN"
+  );
+};
+
+const hasSuperAdminRole = (roles = []) => {
+  return roles.some((role) => isSuperAdminRole(role));
+};
+
 const validateDepartmentIfProvided = async (departmentId) => {
   if (!departmentId) {
     return null;
@@ -57,7 +85,10 @@ const validateDepartmentIfProvided = async (departmentId) => {
   return department;
 };
 
-const validateAssignableRoleIds = async (roleIds = []) => {
+const validateAssignableRoleIds = async ({
+  roleIds = [],
+  actorIsSuperAdmin = false,
+}) => {
   const uniqueRoleIds = Array.from(new Set(roleIds));
 
   if (uniqueRoleIds.length === 0) {
@@ -75,12 +106,19 @@ const validateAssignableRoleIds = async (roleIds = []) => {
     throw new ApiError(400, "One or more roles are invalid or inactive");
   }
 
-  const hasSystemRole = roles.some(
-    (role) => role.isSystemRole || role.code === SYSTEM_ROLES.SUPER_ADMIN
-  );
+  const selectedSuperAdminRole = roles.find((role) => isSuperAdminRole(role));
 
-  if (hasSystemRole) {
-    throw new ApiError(400, "System roles cannot be assigned manually");
+  if (selectedSuperAdminRole) {
+    if (!actorIsSuperAdmin) {
+      throw new ApiError(403, "Only Super Admin can assign Super Admin role");
+    }
+
+    if (roles.length > 1) {
+      throw new ApiError(
+        400,
+        "Super Admin role cannot be combined with other roles"
+      );
+    }
   }
 
   return roles;
@@ -89,6 +127,10 @@ const validateAssignableRoleIds = async (roleIds = []) => {
 const assertCanModifyUser = ({ targetUser }) => {
   if (!targetUser) {
     throw new ApiError(404, "User not found");
+  }
+
+  if (targetUser.isSuperAdmin) {
+    throw new ApiError(400, "Super Admin user cannot be edited");
   }
 };
 
@@ -134,10 +176,104 @@ const assertCanAssignRoles = ({ targetUser }) => {
   }
 };
 
+const assertSuperAdminAction = ({ req }) => {
+  if (!req.user?.isSuperAdmin) {
+    throw new ApiError(403, "Only Super Admin can perform this action");
+  }
+};
+
+const generatePasswordResetRawToken = () => {
+  return crypto.randomBytes(48).toString("hex");
+};
+
+const getPasswordResetExpiryDate = () => {
+  const expiresAt = new Date();
+
+  expiresAt.setMinutes(
+    expiresAt.getMinutes() + env.passwordResetTokenExpiresMinutes
+  );
+
+  return expiresAt;
+};
+
+const buildResetPasswordUrl = (rawToken) => {
+  const baseUrl = env.frontendResetPasswordUrl.replace(/\/$/, "");
+
+  return `${baseUrl}/${rawToken}`;
+};
+
+const createPasswordResetTokenForUser = async ({ user, req }) => {
+  await PasswordResetToken.updateMany(
+    {
+      user: user._id,
+      usedAt: null,
+    },
+    {
+      $set: {
+        usedAt: new Date(),
+        usedByIp: getRequestIp(req),
+      },
+    }
+  );
+
+  const rawToken = generatePasswordResetRawToken();
+  const tokenHash = hashToken(rawToken);
+  const resetUrl = buildResetPasswordUrl(rawToken);
+
+  const resetToken = await PasswordResetToken.create({
+    user: user._id,
+    tokenHash,
+    expiresAt: getPasswordResetExpiryDate(),
+    requestedByIp: getRequestIp(req),
+    userAgent: getUserAgent(req),
+  });
+
+  return {
+    rawToken,
+    resetUrl,
+    resetToken,
+  };
+};
+
+const sendAccountCreatedCredentials = async ({ user, temporaryPassword }) => {
+  const emailContent = buildAccountCreatedEmail({
+    name: user.name,
+    email: user.email,
+    temporaryPassword,
+  });
+
+  return sendAccountCreatedEmail({
+    to: user.email,
+    subject: emailContent.subject,
+    text: emailContent.text,
+    html: emailContent.html,
+  });
+};
+
+const sendPasswordResetLink = async ({ user, resetUrl }) => {
+  const emailContent = buildPasswordResetEmail({
+    name: user.name,
+    resetUrl,
+    expiresInMinutes: env.passwordResetTokenExpiresMinutes,
+  });
+
+  return sendPasswordResetEmail({
+    to: user.email,
+    subject: emailContent.subject,
+    text: emailContent.text,
+    html: emailContent.html,
+  });
+};
+
 export const createUserService = async ({ payload, actorId, req }) => {
   await validateDepartmentIfProvided(payload.department);
 
-  const validRoles = await validateAssignableRoleIds(payload.roles);
+  const validRoles = await validateAssignableRoleIds({
+    roleIds: payload.roles,
+    actorIsSuperAdmin: Boolean(req.user?.isSuperAdmin),
+  });
+
+  const userHasSuperAdminRole = hasSuperAdminRole(validRoles);
 
   const existingUser = await User.findOne({
     email: payload.email.toLowerCase(),
@@ -153,12 +289,17 @@ export const createUserService = async ({ payload, actorId, req }) => {
     name: payload.name,
     email: payload.email.toLowerCase(),
     password: hashedPassword,
-    department: payload.department || null,
+    department: userHasSuperAdminRole ? null : payload.department || null,
     roles: validRoles.map((role) => role._id),
     status: payload.status || STATUS.ACTIVE,
-    isSuperAdmin: false,
+    isSuperAdmin: userHasSuperAdminRole,
     createdBy: actorId || null,
     updatedBy: actorId || null,
+  });
+
+  const mailResult = await sendAccountCreatedCredentials({
+    user,
+    temporaryPassword: payload.password,
   });
 
   await createAuditLog({
@@ -167,7 +308,9 @@ export const createUserService = async ({ payload, actorId, req }) => {
     action: "CREATE",
     entityType: "User",
     entityId: user._id,
-    description: `User created: ${user.email}`,
+    description: userHasSuperAdminRole
+      ? `Super Admin user created: ${user.email}`
+      : `User created: ${user.email}`,
     status: "success",
     metadata: {
       userId: user._id,
@@ -175,11 +318,19 @@ export const createUserService = async ({ payload, actorId, req }) => {
       email: user.email,
       department: user.department,
       status: user.status,
+      isSuperAdmin: user.isSuperAdmin,
       roles: getRoleSummary(validRoles),
+      credentialsEmailSent: true,
+      emailPreviewUrl: env.isDevelopment ? mailResult.previewUrl || null : null,
+      emailMessageId: mailResult.messageId || null,
     },
   });
 
-  return getPopulatedUserById(user._id);
+  return {
+    user: await getPopulatedUserById(user._id),
+    emailPreviewUrl: mailResult.previewUrl || null,
+    emailMessageId: mailResult.messageId || null,
+  };
 };
 
 export const getUsersService = async ({
@@ -272,12 +423,7 @@ export const updateUserService = async ({ userId, payload, actorId, req }) => {
 
   assertCanModifyUser({
     targetUser: user,
-    actorId,
   });
-
-  if (user.isSuperAdmin && payload.department !== undefined) {
-    throw new ApiError(400, "Super Admin department cannot be modified");
-  }
 
   const previousUser = {
     name: user.name,
@@ -411,9 +557,17 @@ export const assignUserRolesService = async ({
   });
 
   const previousRoles = getRoleSummary(user.roles || []);
-  const validRoles = await validateAssignableRoleIds(roleIds);
+
+  const validRoles = await validateAssignableRoleIds({
+    roleIds,
+    actorIsSuperAdmin: Boolean(req.user?.isSuperAdmin),
+  });
+
+  const userHasSuperAdminRole = hasSuperAdminRole(validRoles);
 
   user.roles = validRoles.map((role) => role._id);
+  user.isSuperAdmin = userHasSuperAdminRole;
+  user.department = userHasSuperAdminRole ? null : user.department;
   user.updatedBy = actorId || null;
 
   await user.save();
@@ -424,17 +578,76 @@ export const assignUserRolesService = async ({
     action: "ROLES_ASSIGNED",
     entityType: "User",
     entityId: user._id,
-    description: `User roles updated: ${user.email}`,
+    description: userHasSuperAdminRole
+      ? `User promoted to Super Admin: ${user.email}`
+      : `User roles updated: ${user.email}`,
     status: "success",
     metadata: {
       userId: user._id,
       email: user.email,
+      isSuperAdmin: user.isSuperAdmin,
       before: previousRoles,
       after: getRoleSummary(validRoles),
     },
   });
 
   return getPopulatedUserById(user._id);
+};
+
+export const sendUserPasswordResetService = async ({ userId, actorId, req }) => {
+  assertSuperAdminAction({
+    req,
+  });
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (user.status !== STATUS.ACTIVE) {
+    throw new ApiError(400, "Password reset can only be sent to active users");
+  }
+
+  const { resetUrl, resetToken } = await createPasswordResetTokenForUser({
+    user,
+    req,
+  });
+
+  const mailResult = await sendPasswordResetLink({
+    user,
+    resetUrl,
+  });
+
+  const isSelfResetRequest =
+    actorId && user._id.toString() === actorId.toString();
+
+  await createAuditLog({
+    req,
+    module: "USER",
+    action: "PASSWORD_RESET_EMAIL_SENT",
+    entityType: "User",
+    entityId: user._id,
+    description: isSelfResetRequest
+      ? `Super Admin sent password reset email to own account: ${user.email}`
+      : `Super Admin sent password reset email to user: ${user.email}`,
+    status: "success",
+    metadata: {
+      userId: user._id,
+      email: user.email,
+      requestedBy: actorId || null,
+      isSelfResetRequest,
+      resetTokenId: resetToken._id,
+      emailPreviewUrl: env.isDevelopment ? mailResult.previewUrl || null : null,
+      emailMessageId: mailResult.messageId || null,
+    },
+  });
+
+  return {
+    user: await getPopulatedUserById(user._id),
+    emailPreviewUrl: mailResult.previewUrl || null,
+    emailMessageId: mailResult.messageId || null,
+  };
 };
 
 export const deleteUserService = async ({ userId, actorId, req }) => {
@@ -467,6 +680,7 @@ export const deleteUserService = async ({ userId, actorId, req }) => {
         department: user.department,
         roles: getRoleSummary(user.roles || []),
         status: user.status,
+        isSuperAdmin: user.isSuperAdmin,
       },
     },
   });

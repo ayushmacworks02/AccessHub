@@ -22,6 +22,18 @@ export const PERMISSION_REGISTRY = {
     },
   },
 
+  GROUP: {
+    label: "Groups",
+    actions: {
+      CREATE: "Create groups",
+      READ: "View groups",
+      UPDATE: "Update groups",
+      DELETE: "Delete groups",
+      MANAGE_USERS: "Manage group users",
+      MANAGE_ROLES: "Manage group roles",
+    },
+  },
+
   DEPARTMENT: {
     label: "Departments",
     actions: {

@@ -1,17 +1,10 @@
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
-import { Loader2 } from "lucide-react";
+import { Building2, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -22,6 +15,12 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
+import {
+  AppDialogBody,
+  AppDialogContent,
+  AppDialogFooter,
+  AppDialogHeader,
+} from "@/components/common/app-dialog-shell";
 import { FormFieldWrapper } from "@/components/forms/form-field-wrapper";
 import { departmentFormSchema } from "@/features/departments/schemas/department.schema";
 import { useDepartmentsStore } from "@/features/departments/store/departments.store";
@@ -95,91 +94,89 @@ export function DepartmentFormDialog() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[92svh] overflow-y-auto p-0 sm:max-w-xl">
-        <DialogHeader className="border-b px-4 py-4 sm:px-6">
-          <DialogTitle>
-            {isEditMode ? "Edit department" : "Create department"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditMode
-              ? "Update department details and status."
-              : "Create a new department for organizing users and roles."}
-          </DialogDescription>
-        </DialogHeader>
+      <AppDialogContent size="md">
+        <AppDialogHeader
+          icon={Building2}
+          title={isEditMode ? "Edit department" : "Create department"}
+          description={
+            isEditMode
+              ? "Update department details and availability."
+              : "Create a department for organizing users and roles."
+          }
+        />
 
-        <form
-          className="space-y-5 px-4 py-4 sm:px-6"
-          onSubmit={form.handleSubmit(onSubmit)}
-        >
-          <div className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <AppDialogBody className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormFieldWrapper
+                label="Department name"
+                required
+                error={form.formState.errors.name?.message}
+              >
+                <Input
+                  placeholder="Information Security"
+                  aria-invalid={Boolean(form.formState.errors.name)}
+                  {...form.register("name")}
+                />
+              </FormFieldWrapper>
+
+              <FormFieldWrapper
+                label="Department code"
+                required
+                error={form.formState.errors.code?.message}
+              >
+                <Input
+                  placeholder="INFOSEC"
+                  aria-invalid={Boolean(form.formState.errors.code)}
+                  {...form.register("code")}
+                  onInput={(event) => {
+                    event.currentTarget.value =
+                      event.currentTarget.value.toUpperCase();
+                  }}
+                />
+              </FormFieldWrapper>
+            </div>
+
             <FormFieldWrapper
-              label="Department name"
+              label="Status"
               required
-              error={form.formState.errors.name?.message}
+              error={form.formState.errors.status?.message}
             >
-              <Input
-                placeholder="Information Security"
-                aria-invalid={Boolean(form.formState.errors.name)}
-                {...form.register("name")}
+              <Controller
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger
+                      className="w-full"
+                      aria-invalid={Boolean(form.formState.errors.status)}
+                    >
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               />
             </FormFieldWrapper>
 
             <FormFieldWrapper
-              label="Department code"
-              required
-              error={form.formState.errors.code?.message}
+              label="Description"
+              error={form.formState.errors.description?.message}
             >
-              <Input
-                placeholder="INFOSEC"
-                aria-invalid={Boolean(form.formState.errors.code)}
-                {...form.register("code")}
-                onInput={(event) => {
-                  event.currentTarget.value =
-                    event.currentTarget.value.toUpperCase();
-                }}
+              <Textarea
+                placeholder="Short description about this department"
+                className="min-h-28 resize-none"
+                aria-invalid={Boolean(form.formState.errors.description)}
+                {...form.register("description")}
               />
             </FormFieldWrapper>
-          </div>
+          </AppDialogBody>
 
-          <FormFieldWrapper
-            label="Status"
-            required
-            error={form.formState.errors.status?.message}
-          >
-            <Controller
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger
-                    className="w-full"
-                    aria-invalid={Boolean(form.formState.errors.status)}
-                  >
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </FormFieldWrapper>
-
-          <FormFieldWrapper
-            label="Description"
-            error={form.formState.errors.description?.message}
-          >
-            <Textarea
-              placeholder="Short description about this department"
-              className="min-h-24 resize-none"
-              aria-invalid={Boolean(form.formState.errors.description)}
-              {...form.register("description")}
-            />
-          </FormFieldWrapper>
-
-          <DialogFooter className="-mx-4 -mb-4 border-t px-4 py-4 sm:-mx-6 sm:px-6">
+          <AppDialogFooter>
             <Button type="submit" disabled={isPending}>
               {isPending ? (
                 <>
@@ -192,9 +189,9 @@ export function DepartmentFormDialog() {
                 "Create department"
               )}
             </Button>
-          </DialogFooter>
+          </AppDialogFooter>
         </form>
-      </DialogContent>
+      </AppDialogContent>
     </Dialog>
   );
 }

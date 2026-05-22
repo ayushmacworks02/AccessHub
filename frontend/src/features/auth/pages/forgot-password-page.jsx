@@ -40,7 +40,7 @@ export function ForgotPasswordPage() {
     <Card className="w-full border-border/80 shadow-sm">
       <CardHeader className="space-y-2">
         <div className="inline-flex h-9 w-fit items-center rounded-lg border bg-muted px-3 text-sm font-semibold lg:hidden">
-          AccessHub
+          {appConfig.name}
         </div>
 
         <CardTitle className="text-xl sm:text-2xl">

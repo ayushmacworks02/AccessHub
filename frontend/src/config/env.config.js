@@ -9,7 +9,7 @@ const getEnvValue = (key, fallback = "") => {
 };
 
 export const envConfig = {
-  appName: getEnvValue("VITE_APP_NAME", "AccessHub"),
+  appName: getEnvValue("VITE_APP_NAME", "NxAuth"),
 
   apiBaseUrl: getEnvValue(
     "VITE_API_BASE_URL",

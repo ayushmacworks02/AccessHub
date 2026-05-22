@@ -113,12 +113,39 @@ export const useForgotPasswordMutation = () => {
 export const useResetPasswordMutation = () => {
   const navigate = useNavigate();
 
+  const clearUser = useAuthStore((state) => state.clearUser);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
   return useMutation({
     mutationFn: authApi.resetPassword,
-    onSuccess: () => {
-      toast.success("Password reset successful. Please login.", {
+    onSuccess: (data) => {
+      const sessionCleared = Boolean(data?.sessionCleared);
+
+      if (sessionCleared) {
+        clearUser();
+        queryClient.clear();
+
+        toast.success("Password reset successful. Please login again.", {
+          id: "reset-password-success",
+        });
+
+        navigate(appConfig.routes.login, {
+          replace: true,
+        });
+
+        return;
+      }
+
+      toast.success("Password reset successful.", {
         id: "reset-password-success",
       });
+
+      if (isAuthenticated) {
+        navigate(appConfig.routes.dashboard, {
+          replace: true,
+        });
+        return;
+      }
 
       navigate(appConfig.routes.login, {
         replace: true,

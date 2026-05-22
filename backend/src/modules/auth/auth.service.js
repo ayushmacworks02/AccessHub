@@ -4,6 +4,7 @@ import { env } from "../../config/env.js";
 import { ApiError } from "../../utils/api-error.js";
 import { STATUS } from "../../constants/status.js";
 import { User } from "../users/user.model.js";
+import { Group } from "../groups/group.model.js";
 import { hashPassword, verifyPassword } from "../../utils/password.js";
 import { hashToken } from "../../utils/token-hash.js";
 import { getRequestIp, getUserAgent } from "../../utils/request-meta.js";
@@ -41,26 +42,75 @@ const getUserWithRolesAndPermissions = async (userId) => {
     });
 };
 
-const extractUserPermissions = (user) => {
-  if (!user?.roles?.length) {
-    return [];
-  }
+const getUserActiveGroupsWithRolesAndPermissions = async (userId) => {
+  return Group.find({
+    users: userId,
+    status: STATUS.ACTIVE,
+  })
+    .select("name code description status roles")
+    .populate({
+      path: "roles",
+      select: "name code status permissions isSystemRole",
+      populate: {
+        path: "permissions",
+        select: "module action key label status",
+      },
+    })
+    .lean();
+};
 
-  const permissions = new Set();
-
-  user.roles.forEach((role) => {
-    if (role.status !== STATUS.ACTIVE) {
+const addRolePermissionsToSet = ({ roles = [], permissionsSet }) => {
+  roles.forEach((role) => {
+    if (!role || role.status !== STATUS.ACTIVE) {
       return;
     }
 
     role.permissions?.forEach((permission) => {
-      if (permission.status === STATUS.ACTIVE) {
-        permissions.add(permission.key);
+      if (permission?.status === STATUS.ACTIVE && permission?.key) {
+        permissionsSet.add(permission.key);
       }
+    });
+  });
+};
+
+const extractEffectivePermissions = ({ user, groups = [] }) => {
+  if (user?.isSuperAdmin) {
+    return ["*"];
+  }
+
+  const permissions = new Set();
+
+  addRolePermissionsToSet({
+    roles: user?.roles || [],
+    permissionsSet: permissions,
+  });
+
+  groups.forEach((group) => {
+    addRolePermissionsToSet({
+      roles: group.roles || [],
+      permissionsSet: permissions,
     });
   });
 
   return Array.from(permissions);
+};
+
+const getGroupSummary = (groups = []) => {
+  return groups.map((group) => ({
+    _id: group._id,
+    name: group.name,
+    code: group.code,
+    status: group.status,
+    roles: Array.isArray(group.roles)
+      ? group.roles.map((role) => ({
+          _id: role._id,
+          name: role.name,
+          code: role.code,
+          status: role.status,
+          isSystemRole: role.isSystemRole,
+        }))
+      : [],
+  }));
 };
 
 const generatePasswordResetRawToken = () => {
@@ -80,7 +130,7 @@ const buildResetPasswordUrl = (rawToken) => {
   return `${baseUrl}/${rawToken}`;
 };
 
-export const buildAuthUserResponse = (user) => {
+export const buildAuthUserResponse = ({ user, groups = [] }) => {
   const plainUser = user.toObject ? user.toObject() : user;
 
   return {
@@ -89,10 +139,14 @@ export const buildAuthUserResponse = (user) => {
     email: plainUser.email,
     department: plainUser.department,
     roles: plainUser.roles,
+    groups: getGroupSummary(groups),
     isSuperAdmin: plainUser.isSuperAdmin,
     status: plainUser.status,
     lastLoginAt: plainUser.lastLoginAt,
-    permissions: plainUser.isSuperAdmin ? ["*"] : extractUserPermissions(user),
+    permissions: extractEffectivePermissions({
+      user: plainUser,
+      groups,
+    }),
   };
 };
 
@@ -185,6 +239,9 @@ export const loginUser = async ({ email, password, req }) => {
   });
 
   const freshUser = await getUserWithRolesAndPermissions(user._id);
+  const groups = freshUser.isSuperAdmin
+    ? []
+    : await getUserActiveGroupsWithRolesAndPermissions(freshUser._id);
 
   await createAuditLog({
     req,
@@ -198,13 +255,17 @@ export const loginUser = async ({ email, password, req }) => {
     metadata: {
       email: user.email,
       isSuperAdmin: user.isSuperAdmin,
+      groupsCount: groups.length,
     },
   });
 
   return {
     accessToken,
     refreshToken: rawRefreshToken,
-    user: buildAuthUserResponse(freshUser),
+    user: buildAuthUserResponse({
+      user: freshUser,
+      groups,
+    }),
   };
 };
 
@@ -315,6 +376,10 @@ export const refreshUserSession = async ({ rawRefreshToken, req }) => {
     throw new ApiError(401, "User account is not active");
   }
 
+  const groups = user.isSuperAdmin
+    ? []
+    : await getUserActiveGroupsWithRolesAndPermissions(user._id);
+
   const accessToken = generateAccessToken(user);
 
   const { rawRefreshToken: newRawRefreshToken } = await rotateRefreshToken({
@@ -335,13 +400,17 @@ export const refreshUserSession = async ({ rawRefreshToken, req }) => {
     status: "success",
     metadata: {
       familyId: refreshTokenRecord.familyId,
+      groupsCount: groups.length,
     },
   });
 
   return {
     accessToken,
     refreshToken: newRawRefreshToken,
-    user: buildAuthUserResponse(user),
+    user: buildAuthUserResponse({
+      user,
+      groups,
+    }),
   };
 };
 
@@ -405,7 +474,14 @@ export const getAuthenticatedUser = async (userId) => {
     throw new ApiError(404, "User not found");
   }
 
-  return buildAuthUserResponse(user);
+  const groups = user.isSuperAdmin
+    ? []
+    : await getUserActiveGroupsWithRolesAndPermissions(user._id);
+
+  return buildAuthUserResponse({
+    user,
+    groups,
+  });
 };
 
 export const forgotPasswordService = async ({ email, req }) => {

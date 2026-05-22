@@ -13,6 +13,22 @@ export const USERS_QUERY_KEYS = {
   detail: (userId) => ["users", "detail", userId],
 };
 
+const getUserId = (userOrId) => {
+  if (typeof userOrId === "string") {
+    return userOrId;
+  }
+
+  return userOrId?._id || "";
+};
+
+const getUserLabel = (userOrId) => {
+  if (!userOrId || typeof userOrId === "string") {
+    return "selected user";
+  }
+
+  return userOrId.name || userOrId.email || "selected user";
+};
+
 export function useUsersQuery() {
   const search = useUsersStore((state) => state.search);
   const status = useUsersStore((state) => state.status);
@@ -65,11 +81,27 @@ export function useCreateUserMutation() {
     (state) => state.resetAndCloseFormDialog
   );
 
+  const openEmailPreviewDialog = useUsersStore(
+    (state) => state.openEmailPreviewDialog
+  );
+
   return useMutation({
     mutationFn: usersApi.createUser,
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success("User created successfully");
+
       resetAndCloseFormDialog();
+
+      if (data?.emailPreviewUrl) {
+        openEmailPreviewDialog({
+          title: "User created email preview",
+          description:
+            "The credentials email was generated successfully. Open the preview link to verify the email content.",
+          previewUrl: data.emailPreviewUrl,
+          messageId: data.emailMessageId,
+          status: "success",
+        });
+      }
 
       queryClient.invalidateQueries({
         queryKey: USERS_QUERY_KEYS.all,
@@ -90,6 +122,7 @@ export function useUpdateUserMutation() {
     mutationFn: usersApi.updateUser,
     onSuccess: () => {
       toast.success("User updated successfully");
+
       resetAndCloseFormDialog();
 
       queryClient.invalidateQueries({
@@ -111,6 +144,7 @@ export function useUpdateUserStatusMutation() {
     mutationFn: usersApi.updateUserStatus,
     onSuccess: () => {
       toast.success("User status updated successfully");
+
       resetAndCloseStatusDialog();
 
       queryClient.invalidateQueries({
@@ -132,6 +166,7 @@ export function useAssignUserRolesMutation() {
     mutationFn: usersApi.assignUserRoles,
     onSuccess: () => {
       toast.success("User roles updated successfully");
+
       resetAndCloseRolesDialog();
 
       queryClient.invalidateQueries({
@@ -144,6 +179,63 @@ export function useAssignUserRolesMutation() {
   });
 }
 
+export function useSendUserPasswordResetMutation() {
+  const openEmailPreviewDialog = useUsersStore(
+    (state) => state.openEmailPreviewDialog
+  );
+
+  const updateEmailPreviewDialog = useUsersStore(
+    (state) => state.updateEmailPreviewDialog
+  );
+
+  return useMutation({
+    mutationFn: (userOrId) => usersApi.sendPasswordResetEmail(getUserId(userOrId)),
+
+    onMutate: (userOrId) => {
+      openEmailPreviewDialog({
+        title: "Sending reset email",
+        description: `Generating and sending a password reset email for ${getUserLabel(
+          userOrId
+        )}.`,
+        previewUrl: "",
+        messageId: "",
+        status: "sending",
+      });
+    },
+
+    onSuccess: (data) => {
+      toast.success("Password reset email sent successfully");
+
+      updateEmailPreviewDialog({
+        title: "Password reset email sent",
+        description:
+          "The password reset email was generated successfully. Open the preview link to verify the email content.",
+        previewUrl: data?.emailPreviewUrl || "",
+        messageId: data?.emailMessageId || "",
+        status: "success",
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: USERS_QUERY_KEYS.all,
+      });
+    },
+
+    onError: (error) => {
+      const message = getApiErrorMessage(error, "Unable to send reset email");
+
+      toast.error(message);
+
+      updateEmailPreviewDialog({
+        title: "Reset email failed",
+        description: message,
+        previewUrl: "",
+        messageId: "",
+        status: "error",
+      });
+    },
+  });
+}
+
 export function useDeleteUserMutation() {
   const closeDeleteDialog = useUsersStore((state) => state.closeDeleteDialog);
 
@@ -151,6 +243,7 @@ export function useDeleteUserMutation() {
     mutationFn: usersApi.deleteUser,
     onSuccess: () => {
       toast.success("User deleted successfully");
+
       closeDeleteDialog();
 
       queryClient.invalidateQueries({

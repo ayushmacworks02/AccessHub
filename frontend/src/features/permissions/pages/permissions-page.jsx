@@ -1,13 +1,13 @@
 import { Search, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { PageHeader } from "@/components/common/page-header";
-import { ErrorState } from "@/components/common/error-state";
 import { EmptyState } from "@/components/common/empty-state";
+import { ErrorState } from "@/components/common/error-state";
+import { PageHeader } from "@/components/common/page-header";
 import { TableSkeleton } from "@/components/loaders/table-skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useGroupedPermissionsQuery } from "@/features/permissions/hooks/use-permissions-query";
 
 export function PermissionsPage() {
@@ -23,129 +23,153 @@ export function PermissionsPage() {
     );
   }, [groupedPermissions]);
 
-  const filteredGroups = useMemo(() => {
+  const flattenedPermissions = useMemo(() => {
+    return groupedPermissions.flatMap((group) =>
+      (group.permissions || []).map((permission) => ({
+        ...permission,
+        groupLabel: group.label || group.module,
+      }))
+    );
+  }, [groupedPermissions]);
+
+  const filteredPermissions = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
     if (!normalizedSearch) {
-      return groupedPermissions;
+      return flattenedPermissions;
     }
 
-    return groupedPermissions
-      .map((group) => {
-        const permissions = (group.permissions || []).filter((permission) => {
-          return (
-            permission.label?.toLowerCase().includes(normalizedSearch) ||
-            permission.description?.toLowerCase().includes(normalizedSearch) ||
-            permission.module?.toLowerCase().includes(normalizedSearch) ||
-            permission.action?.toLowerCase().includes(normalizedSearch)
-          );
-        });
-
-        return {
-          ...group,
-          permissions,
-        };
-      })
-      .filter((group) => group.permissions.length > 0);
-  }, [groupedPermissions, search]);
+    return flattenedPermissions.filter((permission) => {
+      return (
+        permission.label?.toLowerCase().includes(normalizedSearch) ||
+        permission.description?.toLowerCase().includes(normalizedSearch) ||
+        permission.module?.toLowerCase().includes(normalizedSearch) ||
+        permission.action?.toLowerCase().includes(normalizedSearch) ||
+        permission.key?.toLowerCase().includes(normalizedSearch)
+      );
+    });
+  }, [flattenedPermissions, search]);
 
   return (
-    <div className="space-y-6">
+    <div className="feature-page">
       <PageHeader
         title="Permissions"
-        description="Review available system permissions grouped by module. Permissions are managed by the backend seed/configuration layer."
+        description="Review available system permissions grouped by module."
       />
 
-      <div className="rounded-xl border bg-card">
-        <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative w-full lg:max-w-sm">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search permissions..."
-              className="pl-8"
-            />
+      <Card className="feature-card">
+        <CardHeader className="feature-card-header">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldCheck className="size-4 text-muted-foreground" />
+                Permission directory
+              </CardTitle>
+
+              <p className="mt-1 text-sm text-muted-foreground">
+                {totalPermissions} permissions available from backend seed/configuration.
+              </p>
+            </div>
+
+            <div className="feature-toolbar">
+              <div className="feature-search">
+                <Search className="feature-search-icon" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search permissions..."
+                  className="feature-search-input"
+                />
+              </div>
+            </div>
           </div>
+        </CardHeader>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="h-8 rounded-lg px-3">
-              {groupedPermissions.length} modules
-            </Badge>
-
-            <Badge variant="secondary" className="h-8 rounded-lg px-3">
-              {totalPermissions} permissions
-            </Badge>
-          </div>
-        </div>
-
-        <div className="p-4">
+        <CardContent className="p-0">
           {permissionsQuery.isLoading ? (
-            <TableSkeleton rows={6} columns={3} />
+            <div className="p-4">
+              <TableSkeleton rows={8} columns={5} />
+            </div>
           ) : permissionsQuery.isError ? (
-            <ErrorState
-              description="Unable to load permissions."
-              onRetry={() => permissionsQuery.refetch()}
-            />
-          ) : filteredGroups.length ? (
-            <div className="grid gap-4">
-              {filteredGroups.map((group) => (
-                <Card key={group.module} className="overflow-hidden">
-                  <CardHeader className="border-b bg-muted/30 px-4 py-3">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <CardTitle className="flex items-center gap-2 text-sm">
-                        <ShieldCheck className="size-4 text-muted-foreground" />
-                        {group.label}
-                      </CardTitle>
+            <div className="p-4 sm:p-6">
+              <ErrorState
+                description="Unable to load permissions."
+                onRetry={() => permissionsQuery.refetch()}
+              />
+            </div>
+          ) : filteredPermissions.length ? (
+            <div className="feature-table-wrap">
+              <table className="feature-table min-w-[1080px]">
+                <thead className="feature-table-head">
+                  <tr>
+                    <th className="feature-th">Permission</th>
+                    <th className="feature-th">Module</th>
+                    <th className="feature-th">Action</th>
+                    <th className="feature-th">Description</th>
+                    <th className="feature-th">Status</th>
+                  </tr>
+                </thead>
 
-                      <Badge variant="outline" className="w-fit rounded-lg">
-                        {group.permissions.length} permissions
-                      </Badge>
-                    </div>
-                  </CardHeader>
+                <tbody className="divide-y">
+                  {filteredPermissions.map((permission) => (
+                    <tr
+                      key={permission._id || permission.key}
+                      className="transition-colors hover:bg-muted/30"
+                    >
+                      <td className="feature-td">
+                        <div className="min-w-0">
+                          <p className="table-primary-text font-medium">
+                            {permission.label}
+                          </p>
 
-                  <CardContent className="p-3">
-                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                      {group.permissions.map((permission) => (
-                        <div
-                          key={permission._id}
-                          className="rounded-lg border bg-background p-3"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="line-clamp-2 text-sm font-medium leading-5">
-                              {permission.label}
-                            </p>
-
-                            {permission.action ? (
-                              <Badge
-                                variant="secondary"
-                                className="shrink-0 rounded-md capitalize"
-                              >
-                                {permission.action.toLowerCase()}
-                              </Badge>
-                            ) : null}
-                          </div>
-
-                          {permission.description ? (
-                            <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                              {permission.description}
-                            </p>
-                          ) : null}
+                          <p className="mt-1 table-secondary-text font-mono text-xs text-muted-foreground">
+                            {permission.key}
+                          </p>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      </td>
+
+                      <td className="feature-td">
+                        <Badge variant="outline" className="rounded-md">
+                          {permission.groupLabel || permission.module}
+                        </Badge>
+                      </td>
+
+                      <td className="feature-td">
+                        <span className="table-code-text">
+                          {permission.action}
+                        </span>
+                      </td>
+
+                      <td className="feature-td">
+                        {permission.description ? (
+                          <p className="table-description-text text-xs leading-5 text-muted-foreground">
+                            {permission.description}
+                          </p>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </td>
+
+                      <td className="feature-td">
+                        <Badge variant="secondary" className="rounded-md capitalize">
+                          {permission.status || "active"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
-            <EmptyState
-              title="No permissions found"
-              description="Try changing your search term."
-            />
+            <div className="p-4 sm:p-6">
+              <EmptyState
+                title="No permissions found"
+                description="Try a different search term."
+              />
+            </div>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

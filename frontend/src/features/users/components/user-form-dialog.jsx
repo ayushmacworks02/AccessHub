@@ -1,20 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
-import { Loader2 } from "lucide-react";
+import { CheckCheck, Loader2, ShieldCheck, UserPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { PasswordInput } from "@/components/forms/password-input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -22,7 +15,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
+import {
+  AppDialogBody,
+  AppDialogContent,
+  AppDialogFooter,
+  AppDialogHeader,
+} from "@/components/common/app-dialog-shell";
+import { PasswordInput } from "@/components/forms/password-input";
 import { FormFieldWrapper } from "@/components/forms/form-field-wrapper";
 import {
   createUserFormSchema,
@@ -37,6 +38,16 @@ import {
   useActiveDepartmentsOptions,
   useActiveRolesOptions,
 } from "@/hooks/use-admin-options";
+import { cn } from "@/lib/utils";
+
+const SUPER_ADMIN_CODES = ["SUPER_ADMIN", "SUPERADMIN"];
+
+const isSuperAdminRole = (role) => {
+  return (
+    Boolean(role?.isSystemRole) ||
+    SUPER_ADMIN_CODES.includes(String(role?.code || "").toUpperCase())
+  );
+};
 
 const normalizeCreateDraft = (values) => ({
   name: values?.name || "",
@@ -66,39 +77,74 @@ export function UserFormDialog() {
 
   const createUserMutation = useCreateUserMutation();
   const updateUserMutation = useUpdateUserMutation();
-
   const departmentsQuery = useActiveDepartmentsOptions();
   const rolesQuery = useActiveRolesOptions();
 
   const departments = departmentsQuery.data || [];
   const roles = rolesQuery.data || [];
-  const isLoadingOptions = departmentsQuery.isLoading || rolesQuery.isLoading;
 
-  const isEditMode = formMode === "edit";
-  const activeDraft = isEditMode ? editDraft : createDraft;
+  const isEditMode = formMode === "edit" && Boolean(selectedUser?._id);
+  const defaultValues = isEditMode ? editDraft : createDraft;
 
   const form = useForm({
     resolver: zodResolver(isEditMode ? updateUserFormSchema : createUserFormSchema),
-    defaultValues: activeDraft,
+    defaultValues,
     mode: "onTouched",
     shouldUnregister: false,
   });
 
+  const selectedRoles = form.watch("roles") || [];
+
+  const superAdminRole = useMemo(() => {
+    return roles.find((role) => isSuperAdminRole(role));
+  }, [roles]);
+
+  const selectedSuperAdminRole = useMemo(() => {
+    if (!superAdminRole?._id) {
+      return null;
+    }
+
+    return selectedRoles.includes(superAdminRole._id) ? superAdminRole : null;
+  }, [selectedRoles, superAdminRole]);
+
+  const hasSelectedSuperAdminRole = Boolean(selectedSuperAdminRole);
+
+  const hasNormalRoleSelected = useMemo(() => {
+    return selectedRoles.some((roleId) => {
+      const selectedRole = roles.find((role) => role._id === roleId);
+      return selectedRole && !isSuperAdminRole(selectedRole);
+    });
+  }, [roles, selectedRoles]);
+
   useEffect(() => {
     if (open) {
-      form.reset(activeDraft);
+      form.reset(defaultValues);
     }
-  }, [activeDraft, form, open]);
+  }, [defaultValues, form, open]);
 
-  const selectedRoles = form.watch("roles") || [];
+  useEffect(() => {
+    if (!open || isEditMode) {
+      return;
+    }
+
+    if (hasSelectedSuperAdminRole) {
+      form.setValue("department", "none", {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+    }
+  }, [form, hasSelectedSuperAdminRole, isEditMode, open]);
+
   const isPending = createUserMutation.isPending || updateUserMutation.isPending;
 
   const handleOpenChange = (nextOpen) => {
     if (!nextOpen) {
+      const values = form.getValues();
+
       if (isEditMode) {
-        setEditDraft(normalizeEditDraft(form.getValues()));
+        setEditDraft(normalizeEditDraft(values));
       } else {
-        setCreateDraft(normalizeCreateDraft(form.getValues()));
+        setCreateDraft(normalizeCreateDraft(values));
       }
 
       closeFormDialog();
@@ -107,12 +153,34 @@ export function UserFormDialog() {
 
   const toggleRole = (roleId, checked) => {
     const currentRoles = form.getValues("roles") || [];
+    const clickedRole = roles.find((role) => role._id === roleId);
+    const clickedRoleIsSuperAdmin = isSuperAdminRole(clickedRole);
 
-    if (checked) {
-      form.setValue("roles", Array.from(new Set([...currentRoles, roleId])), {
+    if (checked && clickedRoleIsSuperAdmin) {
+      form.setValue("roles", [roleId], {
         shouldDirty: true,
         shouldTouch: true,
       });
+
+      form.setValue("department", "none", {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+
+      return;
+    }
+
+    if (checked) {
+      const normalRoleIds = currentRoles.filter((id) => {
+        const role = roles.find((roleItem) => roleItem._id === id);
+        return !isSuperAdminRole(role);
+      });
+
+      form.setValue("roles", Array.from(new Set([...normalRoleIds, roleId])), {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+
       return;
     }
 
@@ -142,15 +210,27 @@ export function UserFormDialog() {
         userId: selectedUser._id,
         payload,
       });
+
       return;
     }
+
+    const selectedRoleObjects = roles.filter((role) =>
+      values.roles?.includes(role._id)
+    );
+
+    const creatingSuperAdmin = selectedRoleObjects.some((role) =>
+      isSuperAdminRole(role)
+    );
 
     const payload = {
       name: values.name.trim(),
       email: values.email.trim().toLowerCase(),
       password: values.password,
-      department: values.department === "none" ? null : values.department,
-      roles: values.roles || [],
+      department:
+        creatingSuperAdmin || values.department === "none"
+          ? null
+          : values.department,
+      roles: Array.isArray(values.roles) ? values.roles : [],
       status: values.status,
     };
 
@@ -159,184 +239,281 @@ export function UserFormDialog() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[92svh] overflow-y-auto p-0 sm:max-w-2xl">
-        <DialogHeader className="border-b px-4 py-4 sm:px-6">
-          <DialogTitle>
-            {isEditMode ? "Edit user" : "Create user"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditMode
-              ? "Update user profile and department details."
-              : "Create a new user and optionally assign department and roles."}
-          </DialogDescription>
-        </DialogHeader>
+      <AppDialogContent
+        size="xl"
+        className="flex max-h-[90svh] min-h-0 flex-col"
+      >
+        <AppDialogHeader
+          icon={UserPlus}
+          title={isEditMode ? "Edit user" : "Create user"}
+          description={
+            isEditMode
+              ? "Update user identity and department details."
+              : "Create a user, assign department, and choose one or more roles."
+          }
+        />
 
         <form
-          className="space-y-5 px-4 py-4 sm:px-6"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
           onSubmit={form.handleSubmit(onSubmit)}
         >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormFieldWrapper
-              label="Full name"
-              required
-              error={form.formState.errors.name?.message}
-            >
-              <Input
-                placeholder="John Doe"
-                aria-invalid={Boolean(form.formState.errors.name)}
-                {...form.register("name")}
-              />
-            </FormFieldWrapper>
-
-            <FormFieldWrapper
-              label="Email"
-              required
-              error={form.formState.errors.email?.message}
-            >
-              <Input
-                type="email"
-                placeholder="john@example.com"
-                autoComplete="email"
-                aria-invalid={Boolean(form.formState.errors.email)}
-                {...form.register("email")}
-              />
-            </FormFieldWrapper>
-          </div>
-
-          <FormFieldWrapper
-            label={isEditMode ? "New password" : "Password"}
-            required={!isEditMode}
-            error={form.formState.errors.password?.message}
-          >
-            <PasswordInput
-              placeholder={
-                isEditMode
-                  ? "Leave blank to keep current password"
-                  : "Create secure password"
-              }
-              autoComplete="new-password"
-              aria-invalid={Boolean(form.formState.errors.password)}
-              {...form.register("password")}
-            />
-          </FormFieldWrapper>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormFieldWrapper
-              label="Department"
-              error={form.formState.errors.department?.message}
-            >
-              <Controller
-                control={form.control}
-                name="department"
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    disabled={departmentsQuery.isLoading}
-                  >
-                    <SelectTrigger
-                      className="w-full"
-                      aria-invalid={Boolean(form.formState.errors.department)}
-                    >
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-
-                    <SelectContent>
-                      <SelectItem value="none">No department</SelectItem>
-                      {departments.map((department) => (
-                        <SelectItem key={department._id} value={department._id}>
-                          {department.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </FormFieldWrapper>
-
-            {!isEditMode ? (
+          <AppDialogBody scrollable className="max-h-[62svh] space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2">
               <FormFieldWrapper
-                label="Status"
+                label="Full name"
                 required
-                error={form.formState.errors.status?.message}
+                error={form.formState.errors.name?.message}
+              >
+                <Input
+                  placeholder="Demo User"
+                  aria-invalid={Boolean(form.formState.errors.name)}
+                  {...form.register("name")}
+                />
+              </FormFieldWrapper>
+
+              <FormFieldWrapper
+                label="Email"
+                required
+                error={form.formState.errors.email?.message}
+              >
+                <Input
+                  type="email"
+                  placeholder="demo.user@example.com"
+                  autoComplete="email"
+                  aria-invalid={Boolean(form.formState.errors.email)}
+                  {...form.register("email")}
+                />
+              </FormFieldWrapper>
+            </div>
+
+            <FormFieldWrapper
+              label={isEditMode ? "New password" : "Temporary password"}
+              required={!isEditMode}
+              error={form.formState.errors.password?.message}
+            >
+              <PasswordInput
+                placeholder={
+                  isEditMode
+                    ? "Leave empty to keep current password"
+                    : "Create temporary password"
+                }
+                autoComplete="new-password"
+                aria-invalid={Boolean(form.formState.errors.password)}
+                {...form.register("password")}
+              />
+            </FormFieldWrapper>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormFieldWrapper
+                label="Department"
+                error={form.formState.errors.department?.message}
               >
                 <Controller
                   control={form.control}
-                  name="status"
+                  name="department"
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={
+                        departmentsQuery.isLoading ||
+                        hasSelectedSuperAdminRole ||
+                        selectedUser?.isSuperAdmin
+                      }
+                    >
                       <SelectTrigger
                         className="w-full"
-                        aria-invalid={Boolean(form.formState.errors.status)}
+                        aria-invalid={Boolean(form.formState.errors.department)}
                       >
-                        <SelectValue placeholder="Select status" />
+                        <SelectValue placeholder="Select department" />
                       </SelectTrigger>
 
                       <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                        <SelectItem value="invited">Invited</SelectItem>
+                        <SelectItem value="none">No department</SelectItem>
+
+                        {departments.map((department) => (
+                          <SelectItem
+                            key={department._id}
+                            value={department._id}
+                          >
+                            {department.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   )}
                 />
-              </FormFieldWrapper>
-            ) : null}
-          </div>
 
-          {!isEditMode ? (
-            <FormFieldWrapper
-              label="Roles"
-              error={form.formState.errors.roles?.message}
-            >
-              <div className="rounded-xl border bg-muted/20 p-3">
-                {isLoadingOptions ? (
-                  <p className="text-sm text-muted-foreground">
-                    Loading roles...
+                {hasSelectedSuperAdminRole ? (
+                  <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                    Super Admin users do not require department mapping.
                   </p>
-                ) : roles.length ? (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {roles.map((role) => {
-                      const checked = selectedRoles.includes(role._id);
+                ) : null}
+              </FormFieldWrapper>
 
-                      return (
-                        <label
-                          key={role._id}
-                          className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background p-3 transition-colors hover:bg-muted/40"
+              {!isEditMode ? (
+                <FormFieldWrapper
+                  label="Status"
+                  required
+                  error={form.formState.errors.status?.message}
+                >
+                  <Controller
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger
+                          className="w-full"
+                          aria-invalid={Boolean(form.formState.errors.status)}
                         >
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={(value) =>
-                              toggleRole(role._id, value === true)
-                            }
-                            className="mt-0.5"
-                          />
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
 
-                          <span className="min-w-0">
-                            <span className="block text-sm font-medium">
-                              {role.name}
-                            </span>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                          <SelectItem value="invited">Invited</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </FormFieldWrapper>
+              ) : null}
+            </div>
 
-                            {role.description ? (
-                              <span className="mt-1 block line-clamp-2 text-xs leading-5 text-muted-foreground">
-                                {role.description}
-                              </span>
-                            ) : null}
-                          </span>
-                        </label>
-                      );
-                    })}
+            {!isEditMode ? (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">
+                      Roles <span className="text-destructive">*</span>
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Select Super Admin alone, or select one or more normal
+                      roles.
+                    </p>
+                  </div>
+
+                  <Badge variant="outline" className="rounded-lg px-3 py-1">
+                    {selectedRoles.length} selected
+                  </Badge>
+                </div>
+
+                {rolesQuery.isLoading ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <Skeleton
+                        key={`create-user-role-skeleton-${index}`}
+                        className="h-24 rounded-xl"
+                      />
+                    ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No active roles available.
-                  </p>
-                )}
-              </div>
-            </FormFieldWrapper>
-          ) : null}
+                  <Controller
+                    control={form.control}
+                    name="roles"
+                    render={({ field }) => (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {roles.map((role) => {
+                          const checked = field.value.includes(role._id);
+                          const roleIsSuperAdmin = isSuperAdminRole(role);
 
-          <DialogFooter className="-mx-4 -mb-4 border-t px-4 py-4 sm:-mx-6 sm:px-6">
+                          const disabled =
+                            (hasSelectedSuperAdminRole && !checked) ||
+                            (roleIsSuperAdmin && hasNormalRoleSelected);
+
+                          return (
+                            <label
+                              key={role._id}
+                              className={cn(
+                                "group flex cursor-pointer items-start gap-3 rounded-xl border bg-background p-4 transition-all",
+                                "hover:border-foreground/20 hover:bg-muted/40",
+                                checked &&
+                                  "border-primary/30 bg-primary/5 ring-1 ring-primary/15",
+                                disabled &&
+                                  "cursor-not-allowed opacity-60 hover:bg-background"
+                              )}
+                            >
+                              <Checkbox
+                                checked={checked}
+                                disabled={disabled}
+                                onCheckedChange={(value) =>
+                                  toggleRole(role._id, value === true)
+                                }
+                                className="mt-0.5"
+                              />
+
+                              <span className="min-w-0 flex-1">
+                                <span className="flex items-start justify-between gap-2">
+                                  <span className="line-clamp-2 text-sm font-medium leading-5">
+                                    {role.name}
+                                  </span>
+
+                                  {checked ? (
+                                    <CheckCheck className="size-4 shrink-0 text-primary" />
+                                  ) : null}
+                                </span>
+
+                                <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                  {roleIsSuperAdmin ? (
+                                    <Badge
+                                      variant="secondary"
+                                      className="rounded-md"
+                                    >
+                                      <ShieldCheck className="size-3" />
+                                      Full access
+                                    </Badge>
+                                  ) : null}
+
+                                  {role.code ? (
+                                    <span className="text-xs text-muted-foreground">
+                                      {role.code}
+                                    </span>
+                                  ) : null}
+                                </span>
+
+                                {role.description ? (
+                                  <span className="mt-1.5 block line-clamp-2 text-xs leading-5 text-muted-foreground">
+                                    {role.description}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </label>
+                          );
+                        })}
+
+                        {!roles.length ? (
+                          <div className="col-span-full rounded-xl border border-dashed bg-muted/20 p-6 text-center">
+                            <p className="text-sm font-medium">
+                              No active roles available
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Create or activate roles before assigning users.
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  />
+                )}
+
+                {form.formState.errors.roles?.message ? (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.roles.message}
+                  </p>
+                ) : null}
+
+                {hasSelectedSuperAdminRole ? (
+                  <div className="rounded-xl border bg-muted/30 p-4 text-sm leading-6 text-muted-foreground">
+                    Super Admin has full access. Other roles are not required
+                    and cannot be combined with Super Admin.
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </AppDialogBody>
+
+          <AppDialogFooter>
             <Button type="submit" disabled={isPending}>
               {isPending ? (
                 <>
@@ -349,9 +526,9 @@ export function UserFormDialog() {
                 "Create user"
               )}
             </Button>
-          </DialogFooter>
+          </AppDialogFooter>
         </form>
-      </DialogContent>
+      </AppDialogContent>
     </Dialog>
   );
 }

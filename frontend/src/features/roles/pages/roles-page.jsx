@@ -1,7 +1,17 @@
-import { Plus, RotateCcw, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
+import { ErrorState } from "@/components/common/error-state";
 import { PageHeader } from "@/components/common/page-header";
+import { PaginationControls } from "@/components/common/pagination-controls";
+import { TableSkeleton } from "@/components/loaders/table-skeleton";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -10,22 +20,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ErrorState } from "@/components/common/error-state";
-import { PaginationControls } from "@/components/common/pagination-controls";
-import { ConfirmDialog } from "@/components/common/confirm-dialog";
-import { TableSkeleton } from "@/components/loaders/table-skeleton";
 
-import { RolesTable } from "@/features/roles/components/roles-table";
 import { RoleFormDialog } from "@/features/roles/components/role-form-dialog";
 import { RolePermissionsDialog } from "@/features/roles/components/role-permissions-dialog";
+import { RolesTable } from "@/features/roles/components/roles-table";
 import {
   useDeleteRoleMutation,
   useRolesQuery,
 } from "@/features/roles/hooks/use-roles";
 import { useRolesStore } from "@/features/roles/store/roles.store";
+import { useActiveDepartmentsOptions } from "@/hooks/use-admin-options";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PERMISSIONS } from "@/lib/rbac/permissions";
-import { useActiveDepartmentsOptions } from "@/hooks/use-admin-options";
 
 export function RolesPage() {
   const search = useRolesStore((state) => state.search);
@@ -40,7 +46,6 @@ export function RolesPage() {
   const setDepartment = useRolesStore((state) => state.setDepartment);
   const setPage = useRolesStore((state) => state.setPage);
   const setLimit = useRolesStore((state) => state.setLimit);
-  const resetFilters = useRolesStore((state) => state.resetFilters);
   const openCreateDialog = useRolesStore((state) => state.openCreateDialog);
   const closeDeleteDialog = useRolesStore((state) => state.closeDeleteDialog);
 
@@ -65,93 +70,97 @@ export function RolesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title="Roles"
-        description="Create roles and assign reusable permission sets for scalable RBAC."
+        description="Manage reusable permission bundles for RBAC."
         actions={
           canCreate ? (
-            <Button onClick={openCreateDialog}>
+            <Button type="button" onClick={openCreateDialog}>
               <Plus className="size-4" />
-              New Role
+              Create role
             </Button>
           ) : null
         }
       />
 
-      <div className="rounded-xl border bg-card">
-        <div className="flex flex-col gap-3 border-b p-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="relative w-full xl:max-w-sm">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search roles..."
-              className="pl-8"
-            />
+      <Card className="overflow-hidden border-border/80">
+        <CardHeader className="border-b bg-muted/20 px-4 py-4 sm:px-5">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
+              <CardTitle className="text-base">Role directory</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Create roles and assign permissions from one place.
+              </p>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-[1fr_150px_180px] xl:w-[680px]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search roles..."
+                  className="h-10 pl-9"
+                />
+              </div>
+
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="all">All status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={department} onValueChange={setDepartment}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Department" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="all">All departments</SelectItem>
+                  {departments.map((item) => (
+                    <SelectItem key={item._id} value={item._id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+        </CardHeader>
 
-          <div className="grid gap-2 sm:grid-cols-3 xl:flex xl:items-center">
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={department} onValueChange={setDepartment}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-
-                {departments.map((departmentItem) => (
-                  <SelectItem
-                    key={departmentItem._id}
-                    value={departmentItem._id}
-                  >
-                    {departmentItem.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Button type="button" variant="outline" onClick={resetFilters}>
-              <RotateCcw className="size-4" />
-              Reset
-            </Button>
-          </div>
-        </div>
-
-        <div className="p-4">
+        <CardContent className="p-0">
           {rolesQuery.isLoading ? (
-            <TableSkeleton rows={8} columns={7} />
+            <div className="p-4">
+              <TableSkeleton rows={8} columns={5} />
+            </div>
           ) : rolesQuery.isError ? (
-            <ErrorState
-              description="Unable to load roles."
-              onRetry={() => rolesQuery.refetch()}
-            />
+            <div className="p-4">
+              <ErrorState
+                description="Unable to load roles."
+                onRetry={() => rolesQuery.refetch()}
+              />
+            </div>
           ) : (
             <RolesTable roles={roles} />
           )}
-        </div>
 
-        {!rolesQuery.isLoading && !rolesQuery.isError ? (
-          <PaginationControls
-            pagination={pagination}
-            limit={limit}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
-          />
-        ) : null}
-      </div>
+          {!rolesQuery.isLoading && !rolesQuery.isError ? (
+            <PaginationControls
+              pagination={pagination}
+              limit={limit}
+              onPageChange={setPage}
+              onLimitChange={setLimit}
+            />
+          ) : null}
+        </CardContent>
+      </Card>
 
       <RoleFormDialog />
       <RolePermissionsDialog />

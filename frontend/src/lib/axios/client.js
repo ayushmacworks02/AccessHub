@@ -38,6 +38,16 @@ const isAuthMeEndpoint = (url = "") => {
   return url.includes(AUTH_ME_ENDPOINT);
 };
 
+const isPublicAuthPage = () => {
+  const currentPath = window.location.pathname;
+
+  return (
+    currentPath === appConfig.routes.login ||
+    currentPath === appConfig.routes.forgotPassword ||
+    currentPath.startsWith(appConfig.routes.resetPassword)
+  );
+};
+
 const processQueue = (error = null) => {
   failedQueue.forEach(({ resolve, reject }) => {
     if (error) {
@@ -52,17 +62,12 @@ const processQueue = (error = null) => {
 };
 
 const redirectToLogin = async () => {
-  const currentPath = window.location.pathname;
-
-  const isAlreadyOnPublicRoute =
-    currentPath === appConfig.routes.login ||
-    currentPath === appConfig.routes.forgotPassword ||
-    currentPath.startsWith(appConfig.routes.resetPassword);
-
-  if (!isAlreadyOnPublicRoute) {
-    window.history.replaceState(null, "", appConfig.routes.login);
-    window.dispatchEvent(new PopStateEvent("popstate"));
+  if (isPublicAuthPage()) {
+    return;
   }
+
+  window.history.replaceState(null, "", appConfig.routes.login);
+  window.dispatchEvent(new PopStateEvent("popstate"));
 };
 
 const handleSessionExpired = async () => {
@@ -73,10 +78,10 @@ const handleSessionExpired = async () => {
     authStoreModule.useAuthStore.getState().clearUser();
     queryClientModule.queryClient.clear();
   } catch {
-    // Keep this silent because this handler is a last-resort auth cleanup.
+    // Silent fallback cleanup.
   }
 
-  if (!sessionExpiredToastShown) {
+  if (!isPublicAuthPage() && !sessionExpiredToastShown) {
     sessionExpiredToastShown = true;
 
     toast.error("Your session has expired. Please sign in again.", {
@@ -106,12 +111,16 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (
-      originalRequest._retry ||
-      isRefreshEndpoint(requestUrl) ||
-      isPublicAuthEndpoint(requestUrl)
-    ) {
-      if (isRefreshEndpoint(requestUrl) || isAuthMeEndpoint(requestUrl)) {
+    if (isPublicAuthEndpoint(requestUrl)) {
+      return Promise.reject(error);
+    }
+
+    if (isAuthMeEndpoint(requestUrl) && isPublicAuthPage()) {
+      return Promise.reject(error);
+    }
+
+    if (originalRequest._retry || isRefreshEndpoint(requestUrl)) {
+      if (!isPublicAuthPage()) {
         await handleSessionExpired();
       }
 
@@ -137,7 +146,11 @@ apiClient.interceptors.response.use(
       return apiClient(originalRequest);
     } catch (refreshError) {
       processQueue(refreshError);
-      await handleSessionExpired();
+
+      if (!isPublicAuthPage()) {
+        await handleSessionExpired();
+      }
+
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

@@ -41,6 +41,11 @@ export const usersApi = {
     return unwrapApiData(response);
   },
 
+  sendPasswordResetEmail: async (userId) => {
+    const response = await apiClient.post(`/users/${userId}/send-password-reset`);
+    return unwrapApiData(response);
+  },
+
   deleteUser: async (userId) => {
     const response = await apiClient.delete(`/users/${userId}`);
     return unwrapApiData(response);

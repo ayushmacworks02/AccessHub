@@ -125,6 +125,16 @@ export const userIdSchema = z.object({
   query: z.object({}).optional(),
 });
 
+export const sendUserPasswordResetSchema = z.object({
+  body: z.object({}).optional(),
+
+  params: z.object({
+    id: objectIdSchema,
+  }),
+
+  query: z.object({}).optional(),
+});
+
 export const listUsersSchema = z.object({
   body: z.object({}).optional(),
   params: z.object({}).optional(),

@@ -1,15 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 
+import { auditsApi } from "@/features/audits/api/audits.api";
 import { departmentsApi } from "@/features/departments/api/departments.api";
+import { groupsApi } from "@/features/groups/api/groups.api";
 import { rolesApi } from "@/features/roles/api/roles.api";
 import { usersApi } from "@/features/users/api/users.api";
-import { auditsApi } from "@/features/audits/api/audits.api";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PERMISSIONS } from "@/lib/rbac/permissions";
 
 const DASHBOARD_QUERY_KEYS = {
   users: ["dashboard", "users-count"],
   roles: ["dashboard", "roles-count"],
+  groups: ["dashboard", "groups-count"],
   departments: ["dashboard", "departments-count"],
   audits: ["dashboard", "audits-count"],
 };
@@ -23,6 +25,7 @@ export function useDashboardStats() {
 
   const canReadUsers = can(PERMISSIONS.USER.READ);
   const canReadRoles = can(PERMISSIONS.ROLE.READ);
+  const canReadGroups = can(PERMISSIONS.GROUP.READ);
   const canReadDepartments = can(PERMISSIONS.DEPARTMENT.READ);
   const canReadAudits = can(PERMISSIONS.AUDIT.READ);
 
@@ -34,6 +37,7 @@ export function useDashboardStats() {
         limit: 1,
         status: "all",
         department: "all",
+        role: "all",
         sortBy: "createdAt",
         sortOrder: "desc",
       }),
@@ -53,6 +57,22 @@ export function useDashboardStats() {
         sortOrder: "desc",
       }),
     enabled: canReadRoles,
+    select: safeTotal,
+  });
+
+  const groupsQuery = useQuery({
+    queryKey: DASHBOARD_QUERY_KEYS.groups,
+    queryFn: () =>
+      groupsApi.getGroups({
+        page: 1,
+        limit: 1,
+        status: "all",
+        user: "all",
+        role: "all",
+        sortBy: "createdAt",
+        sortOrder: "desc",
+      }),
+    enabled: canReadGroups,
     select: safeTotal,
   });
 
@@ -77,7 +97,8 @@ export function useDashboardStats() {
         page: 1,
         limit: 1,
         action: "all",
-        resource: "all",
+        module: "all",
+        status: "all",
         sortBy: "createdAt",
         sortOrder: "desc",
       }),
@@ -88,12 +109,14 @@ export function useDashboardStats() {
   const isLoading =
     usersQuery.isLoading ||
     rolesQuery.isLoading ||
+    groupsQuery.isLoading ||
     departmentsQuery.isLoading ||
     auditsQuery.isLoading;
 
   const isError =
     usersQuery.isError ||
     rolesQuery.isError ||
+    groupsQuery.isError ||
     departmentsQuery.isError ||
     auditsQuery.isError;
 
@@ -113,6 +136,12 @@ export function useDashboardStats() {
       refetch: rolesQuery.refetch,
     },
 
+    groups: {
+      enabled: canReadGroups,
+      total: groupsQuery.data || 0,
+      refetch: groupsQuery.refetch,
+    },
+
     departments: {
       enabled: canReadDepartments,
       total: departmentsQuery.data || 0,
@@ -128,6 +157,7 @@ export function useDashboardStats() {
     refetchAll: () => {
       if (canReadUsers) usersQuery.refetch();
       if (canReadRoles) rolesQuery.refetch();
+      if (canReadGroups) groupsQuery.refetch();
       if (canReadDepartments) departmentsQuery.refetch();
       if (canReadAudits) auditsQuery.refetch();
     },

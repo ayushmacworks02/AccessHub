@@ -1,37 +1,39 @@
 import { create } from "zustand";
 
-const THEME_STORAGE_KEY = "accesshub-theme";
+const THEME_STORAGE_KEY = "nxauth-theme";
 
-const getInitialTheme = () => {
-  if (typeof window === "undefined") {
-    return "system";
-  }
-
+const getStoredTheme = () => {
   return localStorage.getItem(THEME_STORAGE_KEY) || "system";
 };
 
-const applyThemeToDocument = (theme) => {
-  if (typeof window === "undefined") {
+const applyTheme = (theme) => {
+  const root = window.document.documentElement;
+
+  root.classList.remove("light", "dark");
+
+  if (theme === "system") {
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+      .matches
+      ? "dark"
+      : "light";
+
+    root.classList.add(systemTheme);
     return;
   }
 
-  const root = window.document.documentElement;
-  const systemPrefersDark = window.matchMedia(
-    "(prefers-color-scheme: dark)"
-  ).matches;
-
-  const shouldUseDark = theme === "dark" || (theme === "system" && systemPrefersDark);
-
-  root.classList.toggle("dark", shouldUseDark);
+  root.classList.add(theme);
 };
 
 export const useThemeStore = create((set, get) => ({
-  theme: getInitialTheme(),
+  theme: getStoredTheme(),
 
   setTheme: (theme) => {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
-    applyThemeToDocument(theme);
-    set({ theme });
+    applyTheme(theme);
+
+    set({
+      theme,
+    });
   },
 
   toggleTheme: () => {
@@ -39,18 +41,19 @@ export const useThemeStore = create((set, get) => ({
     const nextTheme = currentTheme === "dark" ? "light" : "dark";
 
     localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
-    applyThemeToDocument(nextTheme);
-    set({ theme: nextTheme });
+    applyTheme(nextTheme);
+
+    set({
+      theme: nextTheme,
+    });
   },
 
   initializeTheme: () => {
-    const theme = getInitialTheme();
-    applyThemeToDocument(theme);
-    set({ theme });
+    const theme = getStoredTheme();
+    applyTheme(theme);
+
+    set({
+      theme,
+    });
   },
 }));
-
-export const initializeThemeOnLoad = () => {
-  const theme = getInitialTheme();
-  applyThemeToDocument(theme);
-};

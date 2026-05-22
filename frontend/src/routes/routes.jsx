@@ -5,6 +5,7 @@ import {
   ShieldCheck,
   UserCog,
   Users,
+  UsersRound,
 } from "lucide-react";
 
 import { appConfig } from "@/config/app.config";
@@ -28,6 +29,12 @@ export const appNavigationRoutes = [
     path: appConfig.routes.roles,
     icon: ShieldCheck,
     permissions: [PERMISSIONS.ROLE.READ],
+  },
+  {
+    title: "Groups",
+    path: appConfig.routes.groups,
+    icon: UsersRound,
+    permissions: [PERMISSIONS.GROUP.READ],
   },
   {
     title: "Departments",

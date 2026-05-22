@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+
 import { PasswordInput } from "@/components/forms/password-input";
 import { FormFieldWrapper } from "@/components/forms/form-field-wrapper";
 import { loginFormSchema } from "@/features/auth/schemas/auth.schema";
@@ -37,12 +39,10 @@ export function LoginPage() {
     <Card className="w-full border-border/80 shadow-sm">
       <CardHeader className="space-y-2">
         <div className="inline-flex h-9 w-fit items-center rounded-lg border bg-muted px-3 text-sm font-semibold lg:hidden">
-          AccessHub
+          {appConfig.name}
         </div>
 
-        <CardTitle className="text-xl sm:text-2xl">
-          Sign in
-        </CardTitle>
+        <CardTitle className="text-xl sm:text-2xl">Sign in</CardTitle>
 
         <CardDescription>
           Enter your credentials to access the admin console.

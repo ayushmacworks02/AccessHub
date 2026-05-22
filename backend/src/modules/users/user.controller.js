@@ -1,3 +1,4 @@
+import { env } from "../../config/env.js";
 import { ApiResponse } from "../../utils/api-response.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 import {
@@ -6,20 +7,27 @@ import {
   deleteUserService,
   getUserByIdService,
   getUsersService,
+  sendUserPasswordResetService,
   updateUserService,
   updateUserStatusService,
 } from "./user.service.js";
 
 export const createUser = asyncHandler(async (req, res) => {
-  const user = await createUserService({
+  const result = await createUserService({
     payload: req.validated.body,
     actorId: req.user?._id,
     req,
   });
 
+  const responseData = {
+    user: result.user,
+    emailPreviewUrl: env.isDevelopment ? result.emailPreviewUrl : null,
+    emailMessageId: result.emailMessageId || null,
+  };
+
   return res
     .status(201)
-    .json(new ApiResponse(201, { user }, "User created"));
+    .json(new ApiResponse(201, responseData, "User created"));
 });
 
 export const getUsers = asyncHandler(async (req, res) => {
@@ -71,6 +79,24 @@ export const assignUserRoles = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, { user }, "User roles updated"));
+});
+
+export const sendUserPasswordReset = asyncHandler(async (req, res) => {
+  const result = await sendUserPasswordResetService({
+    userId: req.validated.params.id,
+    actorId: req.user?._id,
+    req,
+  });
+
+  const responseData = {
+    user: result.user,
+    emailPreviewUrl: env.isDevelopment ? result.emailPreviewUrl : null,
+    emailMessageId: result.emailMessageId || null,
+  };
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, responseData, "Password reset email sent"));
 });
 
 export const deleteUser = asyncHandler(async (req, res) => {

@@ -1,17 +1,10 @@
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
-import { Loader2 } from "lucide-react";
+import { Loader2, UserRoundCog } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -20,6 +13,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import {
+  AppDialogBody,
+  AppDialogContent,
+  AppDialogFooter,
+  AppDialogHeader,
+} from "@/components/common/app-dialog-shell";
 import { FormFieldWrapper } from "@/components/forms/form-field-wrapper";
 import { userStatusFormSchema } from "@/features/users/schemas/user.schema";
 import { useUsersStore } from "@/features/users/store/users.store";
@@ -71,48 +70,48 @@ export function UserStatusDialog() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="p-0 sm:max-w-md">
-        <DialogHeader className="border-b px-4 py-4 sm:px-6">
-          <DialogTitle>Change user status</DialogTitle>
-          <DialogDescription>
-            {user
+      <AppDialogContent size="sm">
+        <AppDialogHeader
+          icon={UserRoundCog}
+          title="Change user status"
+          description={
+            user
               ? `Update account status for "${user.name}".`
-              : "Update account status for this user."}
-          </DialogDescription>
-        </DialogHeader>
+              : "Update account status for this user."
+          }
+        />
 
-        <form
-          className="space-y-5 px-4 py-4 sm:px-6"
-          onSubmit={form.handleSubmit(onSubmit)}
-        >
-          <FormFieldWrapper
-            label="Status"
-            required
-            error={form.formState.errors.status?.message}
-          >
-            <Controller
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger
-                    className="w-full"
-                    aria-invalid={Boolean(form.formState.errors.status)}
-                  >
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <AppDialogBody className="space-y-5">
+            <FormFieldWrapper
+              label="Status"
+              required
+              error={form.formState.errors.status?.message}
+            >
+              <Controller
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger
+                      className="w-full"
+                      aria-invalid={Boolean(form.formState.errors.status)}
+                    >
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
 
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                    <SelectItem value="invited">Invited</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </FormFieldWrapper>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="invited">Invited</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </FormFieldWrapper>
+          </AppDialogBody>
 
-          <DialogFooter className="-mx-4 -mb-4 border-t px-4 py-4 sm:-mx-6 sm:px-6">
+          <AppDialogFooter>
             <Button type="submit" disabled={updateStatusMutation.isPending}>
               {updateStatusMutation.isPending ? (
                 <>
@@ -123,9 +122,9 @@ export function UserStatusDialog() {
                 "Update status"
               )}
             </Button>
-          </DialogFooter>
+          </AppDialogFooter>
         </form>
-      </DialogContent>
+      </AppDialogContent>
     </Dialog>
   );
 }

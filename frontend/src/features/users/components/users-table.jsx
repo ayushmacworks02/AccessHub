@@ -3,8 +3,10 @@ import {
   ArrowDownZA,
   Building2,
   KeyRound,
+  MailPlus,
   MoreHorizontal,
   Pencil,
+  Plus,
   ShieldCheck,
   Trash2,
   UserRoundCog,
@@ -17,6 +19,8 @@ import { formatDateTime } from "@/lib/utils/format-date";
 import { useUsersStore } from "@/features/users/store/users.store";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PERMISSIONS } from "@/lib/rbac/permissions";
+import { useAuthStore } from "@/features/auth/store/auth.store";
+import { useSendUserPasswordResetMutation } from "@/features/users/hooks/use-users";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,18 +51,47 @@ const columns = [
   },
 ];
 
+const getDepartmentLabel = (user) => {
+  if (!user?.department) {
+    return "No department";
+  }
+
+  return user.department.name || user.department.code || "Department";
+};
+
+const getRoleLabel = (user) => {
+  if (user?.isSuperAdmin) {
+    return "Super Admin";
+  }
+
+  if (!Array.isArray(user?.roles) || !user.roles.length) {
+    return "No role";
+  }
+
+  if (user.roles.length === 1) {
+    return user.roles[0]?.name || "Role";
+  }
+
+  return `${user.roles.length} roles`;
+};
+
 export function UsersTable({ users = [] }) {
   const sortBy = useUsersStore((state) => state.sortBy);
   const sortOrder = useUsersStore((state) => state.sortOrder);
   const setSorting = useUsersStore((state) => state.setSorting);
 
+  const openCreateDialog = useUsersStore((state) => state.openCreateDialog);
   const openEditDialog = useUsersStore((state) => state.openEditDialog);
   const openStatusDialog = useUsersStore((state) => state.openStatusDialog);
   const openRolesDialog = useUsersStore((state) => state.openRolesDialog);
   const openDeleteDialog = useUsersStore((state) => state.openDeleteDialog);
 
+  const currentUser = useAuthStore((state) => state.user);
+  const resetPasswordMutation = useSendUserPasswordResetMutation();
+
   const { can } = usePermissions();
 
+  const canCreate = can(PERMISSIONS.USER.CREATE);
   const canUpdate = can(PERMISSIONS.USER.UPDATE);
   const canDelete = can(PERMISSIONS.USER.DELETE);
   const canChangeStatus = can(PERMISSIONS.USER.CHANGE_STATUS);
@@ -81,184 +114,192 @@ export function UsersTable({ users = [] }) {
 
   if (!users.length) {
     return (
-      <EmptyState
-        title="No users found"
-        description="Create your first user or adjust the current filters."
-      />
+      <div className="p-6">
+        <EmptyState
+          title="No users found"
+          description="Create your first user or adjust the current filters."
+          action={
+            canCreate ? (
+              <Button type="button" onClick={openCreateDialog}>
+                <Plus className="size-4" />
+                Create user
+              </Button>
+            ) : null
+          }
+        />
+      </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-card">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1080px] text-left text-sm">
-          <thead className="border-b bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
-            <tr>
-              {columns.map((column) => (
-                <th key={column.key} className="px-4 py-3 font-medium">
-                  {column.sortable ? (
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
-                      onClick={() => handleSort(column.key)}
-                    >
-                      <span>{column.label}</span>
-                      {sortBy === column.key ? (
-                        sortOrder === "asc" ? (
-                          <ArrowDownAZ className="size-3.5" />
-                        ) : (
-                          <ArrowDownZA className="size-3.5" />
-                        )
-                      ) : null}
-                    </button>
-                  ) : (
-                    column.label
-                  )}
-                </th>
-              ))}
-
-              <th className="px-4 py-3 font-medium">Department</th>
-              <th className="px-4 py-3 font-medium">Roles</th>
-              <th className="w-16 px-4 py-3 text-right font-medium">
-                Actions
+    <div className="feature-table-wrap">
+      <table className="feature-table">
+        <thead className="feature-table-head">
+          <tr>
+            {columns.map((column) => (
+              <th key={column.key} className="feature-th">
+                {column.sortable ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
+                    onClick={() => handleSort(column.key)}
+                  >
+                    <span>{column.label}</span>
+                    {sortBy === column.key ? (
+                      sortOrder === "asc" ? (
+                        <ArrowDownAZ className="size-3.5" />
+                      ) : (
+                        <ArrowDownZA className="size-3.5" />
+                      )
+                    ) : null}
+                  </button>
+                ) : (
+                  column.label
+                )}
               </th>
-            </tr>
-          </thead>
+            ))}
 
-          <tbody className="divide-y">
-            {users.map((user) => (
-              <tr key={user._id} className="transition-colors hover:bg-muted/40">
-                <td className="px-4 py-3">
-                  <div className="flex items-start gap-3">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border bg-muted text-xs font-semibold uppercase">
-                      {(user.name || user.email || "U").slice(0, 2)}
-                    </div>
+            <th className="feature-th w-16 text-right">Actions</th>
+          </tr>
+        </thead>
 
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium">{user.name}</p>
+        <tbody className="divide-y">
+          {users.map((user) => {
+            const isSelf = currentUser?._id === user._id;
+            const isProtectedSuperAdmin = Boolean(user.isSuperAdmin);
 
-                        {user.isSuperAdmin ? (
-                          <span className="inline-flex items-center gap-1 rounded-md border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                            <ShieldCheck className="size-3" />
-                            Super Admin
-                          </span>
-                        ) : null}
-                      </div>
+            const canShowEdit = canUpdate && !isProtectedSuperAdmin;
+            const canShowStatus =
+              canChangeStatus && !isProtectedSuperAdmin && !isSelf;
+            const canShowRoles = canAssignRole && !isProtectedSuperAdmin;
+            const canShowDelete = canDelete && !isProtectedSuperAdmin && !isSelf;
+            const canShowResetPassword = canUpdate;
 
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        ID: {user._id}
-                      </p>
+            return (
+              <tr key={user._id} className="transition-colors hover:bg-muted/30">
+                <td className="feature-td">
+                  <div className="min-w-0">
+                    <p className="table-primary-text font-medium">{user.name}</p>
+
+                    <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                      <Building2 className="size-3.5 shrink-0" />
+                      <span className="table-secondary-text">
+                        {getDepartmentLabel(user)}
+                      </span>
                     </div>
                   </div>
                 </td>
 
-                <td className="px-4 py-3">
-                  <p className="font-medium">{user.email}</p>
+                <td className="feature-td">
+                  <div className="min-w-0">
+                    <p className="table-secondary-text text-muted-foreground">
+                      {user.email}
+                    </p>
+
+                    <p className="mt-1 table-meta-text text-xs text-muted-foreground">
+                      {getRoleLabel(user)}
+                    </p>
+                  </div>
                 </td>
 
-                <td className="px-4 py-3">
+                <td className="feature-td">
                   <StatusBadge status={user.status} />
                 </td>
 
-                <td className="px-4 py-3 text-muted-foreground">
+                <td className="feature-td text-sm text-muted-foreground">
                   {formatDateTime(user.createdAt)}
                 </td>
 
-                <td className="px-4 py-3">
-                  {user.department ? (
-                    <div className="flex items-start gap-2">
-                      <Building2 className="mt-0.5 size-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{user.department.name}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {user.department.code}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">Not assigned</span>
-                  )}
-                </td>
+                <td className="feature-td text-right">
+                  <DropdownMenu modal={false}>
+                    <DropdownMenuTrigger asChild>
+                      <Button type="button" variant="ghost" size="icon" className="size-8">
+                        <MoreHorizontal className="size-4" />
+                        <span className="sr-only">Open actions</span>
+                      </Button>
+                    </DropdownMenuTrigger>
 
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1.5">
-                    {user.roles?.length ? (
-                      user.roles.slice(0, 2).map((role) => (
-                        <span
-                          key={role._id || role}
-                          className="inline-flex items-center gap-1 rounded-md border bg-muted px-2 py-1 text-xs"
+                    <DropdownMenuContent align="end" className="w-56">
+                      {canShowEdit ? (
+                        <DropdownMenuItem
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            openEditDialog(user);
+                          }}
                         >
-                          <KeyRound className="size-3 text-muted-foreground" />
-                          {role.name || role}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-muted-foreground">No roles</span>
-                    )}
+                          <Pencil className="size-4" />
+                          Edit user
+                        </DropdownMenuItem>
+                      ) : null}
 
-                    {user.roles?.length > 2 ? (
-                      <span className="inline-flex items-center rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground">
-                        +{user.roles.length - 2}
-                      </span>
-                    ) : null}
-                  </div>
-                </td>
+                      {canShowStatus ? (
+                        <DropdownMenuItem
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            openStatusDialog(user);
+                          }}
+                        >
+                          <ShieldCheck className="size-4" />
+                          Change status
+                        </DropdownMenuItem>
+                      ) : null}
 
-                <td className="px-4 py-3 text-right">
-                  {canUpdate || canDelete || canChangeStatus || canAssignRole ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-sm">
-                          <MoreHorizontal className="size-4" />
-                          <span className="sr-only">Open actions</span>
-                        </Button>
-                      </DropdownMenuTrigger>
+                      {canShowRoles ? (
+                        <DropdownMenuItem
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            openRolesDialog(user);
+                          }}
+                        >
+                          <KeyRound className="size-4" />
+                          Manage roles
+                        </DropdownMenuItem>
+                      ) : null}
 
-                      <DropdownMenuContent align="end">
-                        {canUpdate ? (
-                          <DropdownMenuItem onSelect={() => openEditDialog(user)}>
-                            <Pencil className="size-4" />
-                            Edit
-                          </DropdownMenuItem>
-                        ) : null}
+                      {canShowResetPassword ? (
+                        <DropdownMenuItem
+                          disabled={resetPasswordMutation.isPending}
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            resetPasswordMutation.mutate(user);
+                          }}
+                        >
+                          <MailPlus className="size-4" />
+                          Send reset email
+                        </DropdownMenuItem>
+                      ) : null}
 
-                        {canChangeStatus && !user.isSuperAdmin ? (
-                          <DropdownMenuItem
-                            onSelect={() => openStatusDialog(user)}
-                          >
-                            <UserRoundCog className="size-4" />
-                            Change Status
-                          </DropdownMenuItem>
-                        ) : null}
+                      {canShowDelete ? (
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            openDeleteDialog(user);
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                          Delete user
+                        </DropdownMenuItem>
+                      ) : null}
 
-                        {canAssignRole && !user.isSuperAdmin ? (
-                          <DropdownMenuItem onSelect={() => openRolesDialog(user)}>
-                            <KeyRound className="size-4" />
-                            Manage Roles
-                          </DropdownMenuItem>
-                        ) : null}
-
-                        {canDelete && !user.isSuperAdmin ? (
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onSelect={() => openDeleteDialog(user)}
-                          >
-                            <Trash2 className="size-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        ) : null}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">-</span>
-                  )}
+                      {!canShowEdit &&
+                      !canShowStatus &&
+                      !canShowRoles &&
+                      !canShowResetPassword &&
+                      !canShowDelete ? (
+                        <DropdownMenuItem disabled>
+                          <UserRoundCog className="size-4" />
+                          No actions available
+                        </DropdownMenuItem>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

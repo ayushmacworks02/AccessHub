@@ -15,6 +15,7 @@ import authRoutes from "./modules/auth/auth.routes.js";
 import permissionRoutes from "./modules/permissions/permission.routes.js";
 import departmentRoutes from "./modules/departments/department.routes.js";
 import roleRoutes from "./modules/roles/role.routes.js";
+import groupRoutes from "./modules/groups/group.routes.js";
 import userRoutes from "./modules/users/user.routes.js";
 import auditRoutes from "./modules/audits/audit.routes.js";
 
@@ -63,7 +64,7 @@ if (env.isDevelopment) {
 app.get("/", (_req, res) => {
   return res.status(200).json({
     success: true,
-    message: "AccessHub backend is running",
+    message: "NxAuth backend is running",
   });
 });
 
@@ -72,6 +73,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/permissions", permissionRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/roles", roleRoutes);
+app.use("/api/groups", groupRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/audits", auditRoutes);
 

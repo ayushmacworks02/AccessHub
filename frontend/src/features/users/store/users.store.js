@@ -34,6 +34,15 @@ const userRolesEmptyDraft = {
   roles: [],
 };
 
+const previewEmptyState = {
+  open: false,
+  title: "",
+  description: "",
+  previewUrl: "",
+  messageId: "",
+  status: "idle",
+};
+
 const getEntityId = (entity) => {
   if (!entity) {
     return "";
@@ -87,6 +96,8 @@ export const useUsersStore = create((set) => ({
   deleteDialogOpen: false,
   userToDelete: null,
 
+  emailPreviewDialog: previewEmptyState,
+
   setSearch: (search) => {
     set({
       search,
@@ -133,15 +144,36 @@ export const useUsersStore = create((set) => ({
     set(initialFilters);
   },
 
+  openCreateDialog: () => {
+    set({
+      formDialogOpen: true,
+      formMode: "create",
+      selectedUser: null,
+      createDraft: buildCreateDraft(),
+    });
+  },
+
+  openEditDialog: (user) => {
+    set({
+      formDialogOpen: true,
+      formMode: "edit",
+      selectedUser: user,
+      editDraft: buildEditDraft(user),
+    });
+  },
+
+  closeFormDialog: () => {
+    set({
+      formDialogOpen: false,
+      selectedUser: null,
+    });
+  },
+
   setCreateDraft: (draft) => {
     set({
       createDraft: {
-        name: draft?.name || "",
-        email: draft?.email || "",
-        password: draft?.password || "",
-        department: draft?.department || "none",
-        roles: Array.isArray(draft?.roles) ? draft.roles : [],
-        status: draft?.status || "active",
+        ...userCreateEmptyDraft,
+        ...draft,
       },
     });
   },
@@ -149,40 +181,9 @@ export const useUsersStore = create((set) => ({
   setEditDraft: (draft) => {
     set({
       editDraft: {
-        name: draft?.name || "",
-        email: draft?.email || "",
-        password: draft?.password || "",
-        department: draft?.department || "none",
+        ...userEditEmptyDraft,
+        ...draft,
       },
-    });
-  },
-
-  openCreateDialog: () => {
-    set((state) => ({
-      formDialogOpen: true,
-      selectedUser: null,
-      formMode: "create",
-      createDraft: state.formMode === "edit" ? buildCreateDraft() : state.createDraft,
-    }));
-  },
-
-  openEditDialog: (user) => {
-    set((state) => {
-      const isSameUser =
-        state.selectedUser?._id && state.selectedUser._id === user._id;
-
-      return {
-        formDialogOpen: true,
-        selectedUser: user,
-        formMode: "edit",
-        editDraft: isSameUser ? state.editDraft : buildEditDraft(user),
-      };
-    });
-  },
-
-  closeFormDialog: () => {
-    set({
-      formDialogOpen: false,
     });
   },
 
@@ -191,35 +192,32 @@ export const useUsersStore = create((set) => ({
       formDialogOpen: false,
       selectedUser: null,
       formMode: "create",
-      createDraft: userCreateEmptyDraft,
+      createDraft: buildCreateDraft(),
       editDraft: userEditEmptyDraft,
     });
   },
 
-  setStatusDraft: (draft) => {
-    set({
-      statusDraft: {
-        status: draft?.status || "active",
-      },
-    });
-  },
-
   openStatusDialog: (user) => {
-    set((state) => {
-      const isSameUser =
-        state.userForStatus?._id && state.userForStatus._id === user._id;
-
-      return {
-        statusDialogOpen: true,
-        userForStatus: user,
-        statusDraft: isSameUser ? state.statusDraft : buildStatusDraft(user),
-      };
+    set({
+      statusDialogOpen: true,
+      userForStatus: user,
+      statusDraft: buildStatusDraft(user),
     });
   },
 
   closeStatusDialog: () => {
     set({
       statusDialogOpen: false,
+      userForStatus: null,
+    });
+  },
+
+  setStatusDraft: (draft) => {
+    set({
+      statusDraft: {
+        ...userStatusEmptyDraft,
+        ...draft,
+      },
     });
   },
 
@@ -231,30 +229,27 @@ export const useUsersStore = create((set) => ({
     });
   },
 
-  setRolesDraft: (draft) => {
-    set({
-      rolesDraft: {
-        roles: Array.isArray(draft?.roles) ? draft.roles : [],
-      },
-    });
-  },
-
   openRolesDialog: (user) => {
-    set((state) => {
-      const isSameUser =
-        state.userForRoles?._id && state.userForRoles._id === user._id;
-
-      return {
-        rolesDialogOpen: true,
-        userForRoles: user,
-        rolesDraft: isSameUser ? state.rolesDraft : buildRolesDraft(user),
-      };
+    set({
+      rolesDialogOpen: true,
+      userForRoles: user,
+      rolesDraft: buildRolesDraft(user),
     });
   },
 
   closeRolesDialog: () => {
     set({
       rolesDialogOpen: false,
+      userForRoles: null,
+    });
+  },
+
+  setRolesDraft: (draft) => {
+    set({
+      rolesDraft: {
+        ...userRolesEmptyDraft,
+        ...draft,
+      },
     });
   },
 
@@ -277,6 +272,32 @@ export const useUsersStore = create((set) => ({
     set({
       deleteDialogOpen: false,
       userToDelete: null,
+    });
+  },
+
+  openEmailPreviewDialog: (payload = {}) => {
+    set({
+      emailPreviewDialog: {
+        ...previewEmptyState,
+        open: true,
+        ...payload,
+      },
+    });
+  },
+
+  updateEmailPreviewDialog: (payload = {}) => {
+    set((state) => ({
+      emailPreviewDialog: {
+        ...state.emailPreviewDialog,
+        ...payload,
+        open: true,
+      },
+    }));
+  },
+
+  closeEmailPreviewDialog: () => {
+    set({
+      emailPreviewDialog: previewEmptyState,
     });
   },
 }));

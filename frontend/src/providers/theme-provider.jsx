@@ -1,20 +1,24 @@
 import { useEffect } from "react";
+
 import { useThemeStore } from "@/stores/theme.store";
 
 export function ThemeProvider({ children }) {
   const initializeTheme = useThemeStore((state) => state.initializeTheme);
+  const theme = useThemeStore((state) => state.theme);
 
   useEffect(() => {
     initializeTheme();
+  }, [initializeTheme]);
+
+  useEffect(() => {
+    if (theme !== "system") {
+      return undefined;
+    }
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
     const handleSystemThemeChange = () => {
-      const storedTheme = localStorage.getItem("accesshub-theme") || "system";
-
-      if (storedTheme === "system") {
-        initializeTheme();
-      }
+      initializeTheme();
     };
 
     mediaQuery.addEventListener("change", handleSystemThemeChange);
@@ -22,7 +26,7 @@ export function ThemeProvider({ children }) {
     return () => {
       mediaQuery.removeEventListener("change", handleSystemThemeChange);
     };
-  }, [initializeTheme]);
+  }, [initializeTheme, theme]);
 
   return children;
 }

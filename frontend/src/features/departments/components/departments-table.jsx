@@ -3,12 +3,13 @@ import {
   ArrowDownZA,
   MoreHorizontal,
   Pencil,
+  Plus,
   Trash2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/common/status-badge";
 import { EmptyState } from "@/components/common/empty-state";
+import { StatusBadge } from "@/components/common/status-badge";
 import { formatDateTime } from "@/lib/utils/format-date";
 import { useDepartmentsStore } from "@/features/departments/store/departments.store";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -23,7 +24,7 @@ import {
 const columns = [
   {
     key: "name",
-    label: "Name",
+    label: "Department",
     sortable: true,
   },
   {
@@ -32,13 +33,18 @@ const columns = [
     sortable: true,
   },
   {
+    key: "description",
+    label: "Description",
+    sortable: false,
+  },
+  {
     key: "status",
     label: "Status",
     sortable: true,
   },
   {
     key: "updatedAt",
-    label: "Last Updated",
+    label: "Last updated",
     sortable: true,
   },
 ];
@@ -47,6 +53,8 @@ export function DepartmentsTable({ departments = [] }) {
   const sortBy = useDepartmentsStore((state) => state.sortBy);
   const sortOrder = useDepartmentsStore((state) => state.sortOrder);
   const setSorting = useDepartmentsStore((state) => state.setSorting);
+
+  const openCreateDialog = useDepartmentsStore((state) => state.openCreateDialog);
   const openEditDialog = useDepartmentsStore((state) => state.openEditDialog);
   const openDeleteDialog = useDepartmentsStore(
     (state) => state.openDeleteDialog
@@ -54,6 +62,7 @@ export function DepartmentsTable({ departments = [] }) {
 
   const { can } = usePermissions();
 
+  const canCreate = can(PERMISSIONS.DEPARTMENT.CREATE);
   const canUpdate = can(PERMISSIONS.DEPARTMENT.UPDATE);
   const canDelete = can(PERMISSIONS.DEPARTMENT.DELETE);
 
@@ -74,119 +83,136 @@ export function DepartmentsTable({ departments = [] }) {
 
   if (!departments.length) {
     return (
-      <EmptyState
-        title="No departments found"
-        description="Create your first department or adjust the current filters."
-      />
+      <div className="p-6">
+        <EmptyState
+          title="No departments found"
+          description="Create your first department or adjust the current filters."
+          action={
+            canCreate ? (
+              <Button type="button" onClick={openCreateDialog}>
+                <Plus className="size-4" />
+                Create department
+              </Button>
+            ) : null
+          }
+        />
+      </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-card">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="border-b bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
-            <tr>
-              {columns.map((column) => (
-                <th key={column.key} className="px-4 py-3 font-medium">
-                  {column.sortable ? (
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
-                      onClick={() => handleSort(column.key)}
-                    >
-                      <span>{column.label}</span>
-                      {sortBy === column.key ? (
-                        sortOrder === "asc" ? (
-                          <ArrowDownAZ className="size-3.5" />
-                        ) : (
-                          <ArrowDownZA className="size-3.5" />
-                        )
-                      ) : null}
-                    </button>
-                  ) : (
-                    column.label
-                  )}
-                </th>
-              ))}
-
-              <th className="w-16 px-4 py-3 text-right font-medium">
-                Actions
-              </th>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y">
-            {departments.map((department) => (
-              <tr
-                key={department._id}
-                className="transition-colors hover:bg-muted/40"
-              >
-                <td className="px-4 py-3">
-                  <div>
-                    <p className="font-medium">{department.name}</p>
-                    {department.description ? (
-                      <p className="mt-1 line-clamp-1 max-w-md text-xs text-muted-foreground">
-                        {department.description}
-                      </p>
+    <div className="feature-table-wrap">
+      <table className="feature-table min-w-[1080px]">
+        <thead className="feature-table-head">
+          <tr>
+            {columns.map((column) => (
+              <th key={column.key} className="feature-th">
+                {column.sortable ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
+                    onClick={() => handleSort(column.key)}
+                  >
+                    <span>{column.label}</span>
+                    {sortBy === column.key ? (
+                      sortOrder === "asc" ? (
+                        <ArrowDownAZ className="size-3.5" />
+                      ) : (
+                        <ArrowDownZA className="size-3.5" />
+                      )
                     ) : null}
-                  </div>
-                </td>
-
-                <td className="px-4 py-3">
-                  <span className="rounded-md border bg-muted px-2 py-1 font-mono text-xs">
-                    {department.code}
-                  </span>
-                </td>
-
-                <td className="px-4 py-3">
-                  <StatusBadge status={department.status} />
-                </td>
-
-                <td className="px-4 py-3 text-muted-foreground">
-                  {formatDateTime(department.updatedAt || department.createdAt)}
-                </td>
-
-                <td className="px-4 py-3 text-right">
-                  {canUpdate || canDelete ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-sm">
-                          <MoreHorizontal className="size-4" />
-                          <span className="sr-only">Open actions</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-
-                      <DropdownMenuContent align="end">
-                        {canUpdate ? (
-                          <DropdownMenuItem
-                            onSelect={() => openEditDialog(department)}
-                          >
-                            <Pencil className="size-4" />
-                            Edit
-                          </DropdownMenuItem>
-                        ) : null}
-
-                        {canDelete ? (
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onSelect={() => openDeleteDialog(department)}
-                          >
-                            <Trash2 className="size-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        ) : null}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">-</span>
-                  )}
-                </td>
-              </tr>
+                  </button>
+                ) : (
+                  column.label
+                )}
+              </th>
             ))}
-          </tbody>
-        </table>
-      </div>
+
+            <th className="feature-th w-16 text-right">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody className="divide-y">
+          {departments.map((department) => (
+            <tr
+              key={department._id}
+              className="transition-colors hover:bg-muted/30"
+            >
+              <td className="feature-td">
+                <p className="table-primary-text font-medium">
+                  {department.name}
+                </p>
+              </td>
+
+              <td className="feature-td">
+                <p className="table-secondary-text text-muted-foreground">
+                  {department.code}
+                </p>
+              </td>
+
+              <td className="feature-td">
+                {department.description ? (
+                  <p className="table-description-text text-xs leading-5 text-muted-foreground">
+                    {department.description}
+                  </p>
+                ) : (
+                  <span className="text-xs text-muted-foreground">-</span>
+                )}
+              </td>
+
+              <td className="feature-td">
+                <StatusBadge status={department.status} />
+              </td>
+
+              <td className="feature-td text-sm text-muted-foreground">
+                {formatDateTime(department.updatedAt || department.createdAt)}
+              </td>
+
+              <td className="feature-td text-right">
+                {canUpdate || canDelete ? (
+                  <DropdownMenu modal={false}>
+                    <DropdownMenuTrigger asChild>
+                      <Button type="button" variant="ghost" size="icon" className="size-8">
+                        <MoreHorizontal className="size-4" />
+                        <span className="sr-only">Open actions</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+
+                    <DropdownMenuContent align="end" className="w-48">
+                      {canUpdate ? (
+                        <DropdownMenuItem
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            openEditDialog(department);
+                          }}
+                        >
+                          <Pencil className="size-4" />
+                          Edit department
+                        </DropdownMenuItem>
+                      ) : null}
+
+                      {canDelete ? (
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            openDeleteDialog(department);
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                          Delete department
+                        </DropdownMenuItem>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <span className="text-xs text-muted-foreground">-</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

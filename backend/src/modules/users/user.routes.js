@@ -9,6 +9,7 @@ import {
   deleteUser,
   getUserById,
   getUsers,
+  sendUserPasswordReset,
   updateUser,
   updateUserStatus,
 } from "./user.controller.js";
@@ -16,6 +17,7 @@ import {
   assignUserRolesSchema,
   createUserSchema,
   listUsersSchema,
+  sendUserPasswordResetSchema,
   updateUserSchema,
   updateUserStatusSchema,
   userIdSchema,
@@ -69,6 +71,14 @@ router.patch(
   requirePermission(PERMISSIONS.USER.ASSIGN_ROLE),
   validate(assignUserRolesSchema),
   assignUserRoles
+);
+
+router.post(
+  "/:id/send-password-reset",
+  authMiddleware,
+  requirePermission(PERMISSIONS.USER.UPDATE),
+  validate(sendUserPasswordResetSchema),
+  sendUserPasswordReset
 );
 
 router.delete(

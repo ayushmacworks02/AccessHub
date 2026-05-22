@@ -6,6 +6,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/common/empty-state";
 import { formatDateTime } from "@/lib/utils/format-date";
@@ -16,7 +17,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
 
 const columns = [
   {
@@ -69,6 +69,10 @@ const getActorLabel = (audit) => {
   return "System";
 };
 
+const getResourceLabel = (audit) => {
+  return audit?.resource || audit?.module || audit?.entityType || "-";
+};
+
 export function AuditsTable({ audits = [] }) {
   const sortBy = useAuditsStore((state) => state.sortBy);
   const sortOrder = useAuditsStore((state) => state.sortOrder);
@@ -92,109 +96,124 @@ export function AuditsTable({ audits = [] }) {
 
   if (!audits.length) {
     return (
-      <EmptyState
-        title="No audit logs found"
-        description="Audit events will appear here when users perform important actions."
-      />
+      <div className="p-6">
+        <EmptyState
+          title="No audit logs found"
+          description="Audit events will appear here when users perform important actions."
+        />
+      </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-card">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[920px] text-left text-sm">
-          <thead className="border-b bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
-            <tr>
-              {columns.map((column) => (
-                <th key={column.key} className="px-4 py-3 font-medium">
-                  {column.sortable ? (
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
-                      onClick={() => handleSort(column.key)}
-                    >
-                      <span>{column.label}</span>
-                      {sortBy === column.key ? (
-                        sortOrder === "asc" ? (
-                          <ArrowDownAZ className="size-3.5" />
-                        ) : (
-                          <ArrowDownZA className="size-3.5" />
-                        )
-                      ) : null}
-                    </button>
-                  ) : (
-                    column.label
-                  )}
-                </th>
-              ))}
-
-              <th className="w-16 px-4 py-3 text-right font-medium">
-                Actions
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[980px] text-left text-sm">
+        <thead className="border-b bg-background text-xs uppercase tracking-wide text-muted-foreground">
+          <tr>
+            {columns.map((column) => (
+              <th key={column.key} className="px-4 py-3 font-medium">
+                {column.sortable ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
+                    onClick={() => handleSort(column.key)}
+                  >
+                    <span>{column.label}</span>
+                    {sortBy === column.key ? (
+                      sortOrder === "asc" ? (
+                        <ArrowDownAZ className="size-3.5" />
+                      ) : (
+                        <ArrowDownZA className="size-3.5" />
+                      )
+                    ) : null}
+                  </button>
+                ) : (
+                  column.label
+                )}
               </th>
-            </tr>
-          </thead>
+            ))}
 
-          <tbody className="divide-y">
-            {audits.map((audit) => (
-              <tr key={audit._id} className="transition-colors hover:bg-muted/40">
-                <td className="px-4 py-3">
-                  <Badge variant="outline" className="rounded-lg capitalize">
-                    {humanizeText(audit.action)}
-                  </Badge>
-                </td>
+            <th className="w-16 px-4 py-3 text-right font-medium">Actions</th>
+          </tr>
+        </thead>
 
-                <td className="px-4 py-3">
-                  <div className="flex items-start gap-2">
-                    <ShieldCheck className="mt-0.5 size-4 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium capitalize">
-                        {humanizeText(audit.resource)}
+        <tbody className="divide-y">
+          {audits.map((audit) => (
+            <tr key={audit._id} className="transition-colors hover:bg-muted/30">
+              <td className="px-4 py-3">
+                <Badge variant="outline" className="rounded-md capitalize">
+                  {humanizeText(audit.action)}
+                </Badge>
+              </td>
+
+              <td className="px-4 py-3">
+                <div className="flex min-w-0 items-start gap-2">
+                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+
+                  <div className="min-w-0">
+                    <p className="table-primary-text font-medium capitalize">
+                      {humanizeText(getResourceLabel(audit))}
+                    </p>
+
+                    {audit.resourceId || audit.entityId ? (
+                      <p className="mt-1 table-secondary-text font-mono text-xs text-muted-foreground">
+                        {audit.resourceId || audit.entityId}
                       </p>
+                    ) : null}
 
-                      {audit.resourceId ? (
-                        <p className="mt-1 font-mono text-xs text-muted-foreground">
-                          {audit.resourceId}
-                        </p>
-                      ) : null}
-                    </div>
+                    {audit.description ? (
+                      <p className="mt-1 table-description-text text-xs leading-5 text-muted-foreground">
+                        {audit.description}
+                      </p>
+                    ) : null}
                   </div>
-                </td>
+                </div>
+              </td>
 
-                <td className="px-4 py-3">
-                  <p className="font-medium">{getActorLabel(audit)}</p>
+              <td className="px-4 py-3">
+                <div className="min-w-0">
+                  <p className="table-primary-text font-medium">
+                    {getActorLabel(audit)}
+                  </p>
+
                   {audit.ipAddress ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-1 table-meta-text text-xs text-muted-foreground">
                       {audit.ipAddress}
                     </p>
                   ) : null}
-                </td>
+                </div>
+              </td>
 
-                <td className="px-4 py-3 text-muted-foreground">
-                  {formatDateTime(audit.createdAt)}
-                </td>
+              <td className="px-4 py-3 text-sm text-muted-foreground">
+                {formatDateTime(audit.createdAt)}
+              </td>
 
-                <td className="px-4 py-3 text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon-sm">
-                        <MoreHorizontal className="size-4" />
-                        <span className="sr-only">Open actions</span>
-                      </Button>
-                    </DropdownMenuTrigger>
+              <td className="px-4 py-3 text-right">
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="ghost" size="icon" className="size-8">
+                      <MoreHorizontal className="size-4" />
+                      <span className="sr-only">Open actions</span>
+                    </Button>
+                  </DropdownMenuTrigger>
 
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => openDetailDialog(audit)}>
-                        <Eye className="size-4" />
-                        View Details
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        openDetailDialog(audit);
+                      }}
+                    >
+                      <Eye className="size-4" />
+                      View details
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

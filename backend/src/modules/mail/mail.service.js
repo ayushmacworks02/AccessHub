@@ -89,3 +89,17 @@ export const sendPasswordResetEmail = async ({
     html,
   });
 };
+
+export const sendAccountCreatedEmail = async ({
+  to,
+  subject,
+  text,
+  html,
+}) => {
+  return sendMail({
+    to,
+    subject,
+    text,
+    html,
+  });
+};

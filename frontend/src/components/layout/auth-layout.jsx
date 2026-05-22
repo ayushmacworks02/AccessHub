@@ -1,5 +1,7 @@
 import { Outlet } from "react-router-dom";
 
+import { appConfig } from "@/config/app.config";
+
 export function AuthLayout() {
   return (
     <main className="min-h-svh bg-background text-foreground">
@@ -7,17 +9,17 @@ export function AuthLayout() {
         <section className="hidden border-r bg-muted/30 p-10 lg:flex lg:flex-col lg:justify-between">
           <div>
             <div className="inline-flex h-9 items-center rounded-lg border bg-background px-3 text-sm font-semibold shadow-sm">
-              AccessHub
+              {appConfig.name}
             </div>
 
             <div className="mt-16 max-w-xl space-y-4">
               <h1 className="text-4xl font-semibold tracking-tight">
-                Enterprise access management made simple.
+                Secure access management made simple.
               </h1>
 
               <p className="text-base leading-7 text-muted-foreground">
-                Manage users, roles, departments, permissions, and audit trails
-                with a secure RBAC-first workflow.
+                Manage authentication, users, roles, departments, permissions,
+                and audit trails with a secure RBAC-first workflow.
               </p>
             </div>
           </div>

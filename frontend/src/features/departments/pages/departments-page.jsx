@@ -1,7 +1,17 @@
-import { Plus, RotateCcw, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
+import { ErrorState } from "@/components/common/error-state";
 import { PageHeader } from "@/components/common/page-header";
+import { PaginationControls } from "@/components/common/pagination-controls";
+import { TableSkeleton } from "@/components/loaders/table-skeleton";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -10,13 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ErrorState } from "@/components/common/error-state";
-import { PaginationControls } from "@/components/common/pagination-controls";
-import { ConfirmDialog } from "@/components/common/confirm-dialog";
-import { TableSkeleton } from "@/components/loaders/table-skeleton";
 
-import { DepartmentsTable } from "@/features/departments/components/departments-table";
 import { DepartmentFormDialog } from "@/features/departments/components/department-form-dialog";
+import { DepartmentsTable } from "@/features/departments/components/departments-table";
 import {
   useDeleteDepartmentMutation,
   useDepartmentsQuery,
@@ -40,7 +46,6 @@ export function DepartmentsPage() {
   const setStatus = useDepartmentsStore((state) => state.setStatus);
   const setPage = useDepartmentsStore((state) => state.setPage);
   const setLimit = useDepartmentsStore((state) => state.setLimit);
-  const resetFilters = useDepartmentsStore((state) => state.resetFilters);
   const openCreateDialog = useDepartmentsStore((state) => state.openCreateDialog);
   const closeDeleteDialog = useDepartmentsStore(
     (state) => state.closeDeleteDialog
@@ -65,74 +70,82 @@ export function DepartmentsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title="Departments"
-        description="Organize users and roles into departments for cleaner access management."
+        description="Organize users and roles into departments."
         actions={
           canCreate ? (
-            <Button onClick={openCreateDialog}>
+            <Button type="button" onClick={openCreateDialog}>
               <Plus className="size-4" />
-              New Department
+              Create department
             </Button>
           ) : null
         }
       />
 
-      <div className="rounded-xl border bg-card">
-        <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative w-full lg:max-w-sm">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search departments..."
-              className="pl-8"
-            />
+      <Card className="overflow-hidden border-border/80">
+        <CardHeader className="border-b bg-muted/20 px-4 py-4 sm:px-5">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
+              <CardTitle className="text-base">Department directory</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Maintain department records used across users and roles.
+              </p>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-[1fr_150px] xl:w-[520px]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search departments..."
+                  className="h-10 pl-9"
+                />
+              </div>
+
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="all">All status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+        </CardHeader>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Button type="button" variant="outline" onClick={resetFilters}>
-              <RotateCcw className="size-4" />
-              Reset
-            </Button>
-          </div>
-        </div>
-
-        <div className="p-4">
+        <CardContent className="p-0">
           {departmentsQuery.isLoading ? (
-            <TableSkeleton rows={8} columns={5} />
+            <div className="p-4">
+              <TableSkeleton rows={8} columns={5} />
+            </div>
           ) : departmentsQuery.isError ? (
-            <ErrorState
-              description="Unable to load departments."
-              onRetry={() => departmentsQuery.refetch()}
-            />
+            <div className="p-4">
+              <ErrorState
+                description="Unable to load departments."
+                onRetry={() => departmentsQuery.refetch()}
+              />
+            </div>
           ) : (
             <DepartmentsTable departments={departments} />
           )}
-        </div>
 
-        {!departmentsQuery.isLoading && !departmentsQuery.isError ? (
-          <PaginationControls
-            pagination={pagination}
-            limit={limit}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
-          />
-        ) : null}
-      </div>
+          {!departmentsQuery.isLoading && !departmentsQuery.isError ? (
+            <PaginationControls
+              pagination={pagination}
+              limit={limit}
+              onPageChange={setPage}
+              onLimitChange={setLimit}
+            />
+          ) : null}
+        </CardContent>
+      </Card>
 
       <DepartmentFormDialog />
 

@@ -2,20 +2,19 @@ import { useEffect, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { CheckCheck, Loader2, Search, ShieldCheck } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 
+import {
+  AppDialogBody,
+  AppDialogContent,
+  AppDialogFooter,
+  AppDialogHeader,
+} from "@/components/common/app-dialog-shell";
 import { useGroupedPermissionsQuery } from "@/features/permissions/hooks/use-permissions-query";
 import { useReplaceRolePermissionsMutation } from "@/features/roles/hooks/use-roles";
 import { useRolesStore } from "@/features/roles/store/roles.store";
@@ -29,6 +28,7 @@ const normalizePermissionsDraft = (values) => ({
 export function RolePermissionsDialog() {
   const open = useRolesStore((state) => state.permissionsDialogOpen);
   const role = useRolesStore((state) => state.roleForPermissions);
+
   const permissionsDraft = useRolesStore((state) => state.permissionsDraft);
   const setPermissionsDraft = useRolesStore(
     (state) => state.setPermissionsDraft
@@ -48,13 +48,16 @@ export function RolePermissionsDialog() {
   const search = form.watch("search") || "";
   const selectedPermissions = form.watch("permissions") || [];
 
+  const groupedPermissions = groupedPermissionsQuery.data || [];
+
+  const isPending = replacePermissionsMutation.isPending;
+  const isSystemRole = Boolean(role?.isSystemRole);
+
   useEffect(() => {
     if (open) {
       form.reset(permissionsDraft);
     }
-  }, [form, permissionsDraft, open]);
-
-  const groupedPermissions = groupedPermissionsQuery.data || [];
+  }, [form, open, permissionsDraft]);
 
   const totalPermissions = useMemo(() => {
     return groupedPermissions.reduce(
@@ -77,7 +80,8 @@ export function RolePermissionsDialog() {
             permission.label?.toLowerCase().includes(normalizedSearch) ||
             permission.description?.toLowerCase().includes(normalizedSearch) ||
             permission.module?.toLowerCase().includes(normalizedSearch) ||
-            permission.action?.toLowerCase().includes(normalizedSearch)
+            permission.action?.toLowerCase().includes(normalizedSearch) ||
+            permission.key?.toLowerCase().includes(normalizedSearch)
           );
         });
 
@@ -108,6 +112,7 @@ export function RolePermissionsDialog() {
           shouldTouch: true,
         }
       );
+
       return;
     }
 
@@ -133,6 +138,7 @@ export function RolePermissionsDialog() {
           shouldTouch: true,
         }
       );
+
       return;
     }
 
@@ -147,7 +153,7 @@ export function RolePermissionsDialog() {
   };
 
   const onSubmit = (values) => {
-    if (!role?._id) {
+    if (!role?._id || isSystemRole) {
       return;
     }
 
@@ -157,83 +163,102 @@ export function RolePermissionsDialog() {
     });
   };
 
-  const isPending = replacePermissionsMutation.isPending;
-  const isSystemRole = Boolean(role?.isSystemRole);
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="flex h-[92svh] max-h-[92svh] min-h-0 w-[calc(100vw-1.5rem)] flex-col overflow-hidden p-0 sm:max-w-5xl">
-        <DialogHeader className="shrink-0 border-b px-4 py-4 sm:px-6">
-          <div className="flex items-start gap-3 pr-8">
-            <div className="hidden size-9 shrink-0 items-center justify-center rounded-xl border bg-muted sm:flex">
-              <ShieldCheck className="size-4 text-muted-foreground" />
-            </div>
-
-            <div className="min-w-0 space-y-1">
-              <DialogTitle className="truncate">
-                Manage permissions
-              </DialogTitle>
-
-              <DialogDescription className="line-clamp-2">
-                {role
-                  ? `Assign permissions for "${role.name}".`
-                  : "Assign permissions for this role."}
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
+      <AppDialogContent
+        size="wide"
+        className="flex max-h-[92svh] min-h-0 flex-col"
+      >
+        <AppDialogHeader
+          icon={ShieldCheck}
+          title="Manage permissions"
+          description={
+            role
+              ? `Assign permissions for "${role.name}".`
+              : "Assign permissions for this role."
+          }
+        />
 
         <form
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
           onSubmit={form.handleSubmit(onSubmit)}
         >
-          <div className="shrink-0 border-b bg-background/95 px-4 py-4 backdrop-blur sm:px-6">
+          <div className="shrink-0 border-b bg-background px-4 py-4 sm:px-6">
             <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Controller
+                control={form.control}
+                name="search"
+                render={({ field }) => (
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 
-                <Input
-                  placeholder="Search permissions by label, module, or action..."
-                  className="h-9 pl-8"
-                  {...form.register("search")}
-                />
-              </div>
+                    <Input
+                      value={field.value || ""}
+                      onChange={field.onChange}
+                      placeholder="Search permissions by label, module, action, or key..."
+                      className="h-10 pl-9"
+                    />
+                  </div>
+                )}
+              />
 
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="h-8 rounded-lg px-3">
+                <Badge variant="outline" className="h-9 rounded-lg px-3">
                   {selectedPermissions.length} selected
                 </Badge>
 
-                <Badge variant="secondary" className="h-8 rounded-lg px-3">
+                <Badge variant="secondary" className="h-9 rounded-lg px-3">
                   {totalPermissions} available
                 </Badge>
               </div>
             </div>
 
             {isSystemRole ? (
-              <div className="mt-3 rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">
+              <div className="mt-4 rounded-xl border bg-muted/40 px-4 py-3 text-sm leading-6 text-muted-foreground">
                 This is a system role. Super Admin permissions are managed by
                 the system and cannot be modified here.
               </div>
             ) : null}
           </div>
 
-          <div className="scrollbar-soft min-h-0 flex-1 overflow-y-auto bg-muted/20 px-3 py-3 sm:px-6 sm:py-4">
+          <AppDialogBody
+            scrollable
+            muted
+            className="max-h-[58svh] space-y-4"
+          >
             {groupedPermissionsQuery.isLoading ? (
-              <div className="grid gap-3">
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <Skeleton
-                    key={`permission-skeleton-${index}`}
-                    className="h-28 w-full rounded-xl"
-                  />
+              <div className="space-y-4">
+                {Array.from({ length: 4 }).map((_, groupIndex) => (
+                  <div
+                    key={`permission-group-skeleton-${groupIndex}`}
+                    className="rounded-xl border bg-background p-4 shadow-sm"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <Skeleton className="h-5 w-40" />
+                        <Skeleton className="mt-2 h-4 w-24" />
+                      </div>
+
+                      <Skeleton className="h-8 w-24 rounded-lg" />
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {Array.from({ length: 6 }).map((__, itemIndex) => (
+                        <Skeleton
+                          key={`permission-item-skeleton-${groupIndex}-${itemIndex}`}
+                          className="h-24 rounded-xl"
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
-            ) : (
+            ) : filteredGroups.length ? (
               <Controller
                 control={form.control}
                 name="permissions"
                 render={({ field }) => (
-                  <div className="grid gap-3">
+                  <div className="space-y-4">
                     {filteredGroups.map((group) => {
                       const permissionIds = group.permissions.map(
                         (permission) => permission._id
@@ -254,12 +279,12 @@ export function RolePermissionsDialog() {
                       return (
                         <section
                           key={group.module}
-                          className="overflow-hidden rounded-xl border bg-card shadow-sm"
+                          className="overflow-hidden rounded-xl border bg-background shadow-sm"
                         >
-                          <div className="flex items-center justify-between gap-3 border-b bg-muted/35 px-4 py-3">
+                          <div className="flex flex-col gap-3 border-b bg-muted/30 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="min-w-0">
                               <h3 className="truncate text-sm font-semibold">
-                                {group.label}
+                                {group.label || group.module}
                               </h3>
 
                               <p className="mt-1 text-xs text-muted-foreground">
@@ -268,10 +293,14 @@ export function RolePermissionsDialog() {
                               </p>
                             </div>
 
-                            <label className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted">
-                              <span className="hidden sm:inline">
-                                Select all
-                              </span>
+                            <label
+                              className={cn(
+                                "flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted",
+                                isSystemRole &&
+                                  "cursor-not-allowed opacity-60 hover:bg-background"
+                              )}
+                            >
+                              <span>Select all</span>
 
                               <Checkbox
                                 disabled={isSystemRole}
@@ -285,12 +314,14 @@ export function RolePermissionsDialog() {
                                 onCheckedChange={(checked) =>
                                   toggleGroup(permissionIds, checked === true)
                                 }
-                                aria-label={`Select all ${group.label} permissions`}
+                                aria-label={`Select all ${
+                                  group.label || group.module
+                                } permissions`}
                               />
                             </label>
                           </div>
 
-                          <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-3">
+                          <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
                             {group.permissions.map((permission) => {
                               const checked = field.value.includes(
                                 permission._id
@@ -300,10 +331,12 @@ export function RolePermissionsDialog() {
                                 <label
                                   key={permission._id}
                                   className={cn(
-                                    "group flex cursor-pointer items-start gap-3 rounded-lg border bg-background p-3 transition-all",
+                                    "group flex cursor-pointer items-start gap-3 rounded-xl border bg-card p-4 transition-all",
                                     "hover:border-foreground/20 hover:bg-muted/40",
                                     checked &&
-                                      "border-primary/30 bg-primary/5 ring-1 ring-primary/15"
+                                      "border-primary/30 bg-primary/5 ring-1 ring-primary/15",
+                                    isSystemRole &&
+                                      "cursor-not-allowed opacity-70 hover:bg-card"
                                   )}
                                 >
                                   <Checkbox
@@ -330,8 +363,14 @@ export function RolePermissionsDialog() {
                                     </span>
 
                                     {permission.description ? (
-                                      <span className="mt-1 block line-clamp-2 text-xs leading-5 text-muted-foreground">
+                                      <span className="mt-1.5 block line-clamp-2 text-xs leading-5 text-muted-foreground">
                                         {permission.description}
+                                      </span>
+                                    ) : null}
+
+                                    {permission.key ? (
+                                      <span className="mt-2 block truncate text-[11px] text-muted-foreground/80">
+                                        {permission.key}
                                       </span>
                                     ) : null}
                                   </span>
@@ -342,34 +381,40 @@ export function RolePermissionsDialog() {
                         </section>
                       );
                     })}
-
-                    {!filteredGroups.length ? (
-                      <div className="flex min-h-52 items-center justify-center rounded-xl border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
-                        No permissions found for your search.
-                      </div>
-                    ) : null}
                   </div>
                 )}
               />
-            )}
-          </div>
+            ) : (
+              <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed bg-card p-8 text-center">
+                <div>
+                  <ShieldCheck className="mx-auto size-8 text-muted-foreground" />
 
-          <DialogFooter className="shrink-0 border-t bg-background px-4 py-4 sm:px-6">
-            <div className="flex w-full justify-end">
-              <Button type="submit" disabled={isPending || isSystemRole}>
-                {isPending ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Saving permissions...
-                  </>
-                ) : (
-                  "Save permissions"
-                )}
-              </Button>
-            </div>
-          </DialogFooter>
+                  <p className="mt-3 text-sm font-medium">
+                    No permissions found
+                  </p>
+
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Try a different search term.
+                  </p>
+                </div>
+              </div>
+            )}
+          </AppDialogBody>
+
+          <AppDialogFooter>
+            <Button type="submit" disabled={isPending || isSystemRole}>
+              {isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Saving permissions...
+                </>
+              ) : (
+                "Save permissions"
+              )}
+            </Button>
+          </AppDialogFooter>
         </form>
-      </DialogContent>
+      </AppDialogContent>
     </Dialog>
   );
 }

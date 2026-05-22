@@ -3,6 +3,10 @@ import { ApiResponse } from "../../utils/api-response.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 import { clearAuthCookies, setAuthCookies } from "../../utils/cookie-options.js";
 import {
+  findRefreshToken,
+  verifyAccessToken,
+} from "./token.service.js";
+import {
   forgotPasswordService,
   getAuthenticatedUser,
   loginUser,
@@ -11,6 +15,32 @@ import {
   refreshUserSession,
   resetPasswordService,
 } from "./auth.service.js";
+
+const getCurrentSessionUserIdFromRequest = async (req) => {
+  const accessToken = req.cookies?.accessToken;
+
+  if (accessToken) {
+    try {
+      const decoded = verifyAccessToken(accessToken);
+      return decoded?.userId || null;
+    } catch {
+      // Fall back to refresh token lookup below.
+    }
+  }
+
+  const rawRefreshToken = req.cookies?.refreshToken;
+
+  if (!rawRefreshToken) {
+    return null;
+  }
+
+  try {
+    const refreshTokenRecord = await findRefreshToken(rawRefreshToken);
+    return refreshTokenRecord?.user?.toString() || null;
+  } catch {
+    return null;
+  }
+};
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.validated.body;
@@ -112,15 +142,34 @@ export const resetPassword = asyncHandler(async (req, res) => {
   const { password } = req.validated.body;
   const { token } = req.validated.params;
 
-  await resetPasswordService({
+  const currentSessionUserId = await getCurrentSessionUserIdFromRequest(req);
+
+  const result = await resetPasswordService({
     rawToken: token,
     password,
     req,
   });
 
-  clearAuthCookies(res);
+  const resetUserId = result?.userId?.toString();
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, null, "Password reset successful"));
+  const shouldClearCurrentBrowserSession =
+    Boolean(currentSessionUserId) &&
+    Boolean(resetUserId) &&
+    currentSessionUserId === resetUserId;
+
+  if (shouldClearCurrentBrowserSession) {
+    clearAuthCookies(res);
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        sessionCleared: shouldClearCurrentBrowserSession,
+      },
+      shouldClearCurrentBrowserSession
+        ? "Password reset successful. Please login again"
+        : "Password reset successful"
+    )
+  );
 });

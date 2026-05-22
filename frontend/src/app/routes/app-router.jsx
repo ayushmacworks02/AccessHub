@@ -14,70 +14,81 @@ import { useAuthStore } from "@/features/auth/store/auth.store";
 import { PERMISSIONS } from "@/lib/rbac/permissions";
 import { appConfig } from "@/config/app.config";
 
-const LoginPage = lazy(() =>
-  import("@/features/auth/pages/login-page").then((module) => ({
-    default: module.LoginPage,
-  }))
+const lazyNamed = (importer, exportName) =>
+  lazy(() =>
+    importer().then((module) => ({
+      default: module[exportName] || module.default,
+    }))
+  );
+
+const LoginPage = lazyNamed(
+  () => import("@/features/auth/pages/login-page"),
+  "LoginPage"
 );
 
-const ForgotPasswordPage = lazy(() =>
-  import("@/features/auth/pages/forgot-password-page").then((module) => ({
-    default: module.ForgotPasswordPage,
-  }))
+const ForgotPasswordPage = lazyNamed(
+  () => import("@/features/auth/pages/forgot-password-page"),
+  "ForgotPasswordPage"
 );
 
-const ResetPasswordPage = lazy(() =>
-  import("@/features/auth/pages/reset-password-page").then((module) => ({
-    default: module.ResetPasswordPage,
-  }))
+const ResetPasswordPage = lazyNamed(
+  () => import("@/features/auth/pages/reset-password-page"),
+  "ResetPasswordPage"
 );
 
-const DashboardPage = lazy(() =>
-  import("@/features/dashboard/pages/dashboard-page").then((module) => ({
-    default: module.DashboardPage,
-  }))
+const DashboardPage = lazyNamed(
+  () => import("@/features/dashboard/pages/dashboard-page"),
+  "DashboardPage"
 );
 
-const UsersPage = lazy(() =>
-  import("@/features/users/pages/users-page").then((module) => ({
-    default: module.UsersPage,
-  }))
+const UsersPage = lazyNamed(
+  () => import("@/features/users/pages/users-page"),
+  "UsersPage"
 );
 
-const RolesPage = lazy(() =>
-  import("@/features/roles/pages/roles-page").then((module) => ({
-    default: module.RolesPage,
-  }))
+const RolesPage = lazyNamed(
+  () => import("@/features/roles/pages/roles-page"),
+  "RolesPage"
 );
 
-const DepartmentsPage = lazy(() =>
-  import("@/features/departments/pages/departments-page").then((module) => ({
-    default: module.DepartmentsPage,
-  }))
+const GroupsPage = lazyNamed(
+  () => import("@/features/groups/pages/groups-page"),
+  "GroupsPage"
 );
 
-const PermissionsPage = lazy(() =>
-  import("@/features/permissions/pages/permissions-page").then((module) => ({
-    default: module.PermissionsPage,
-  }))
+const DepartmentsPage = lazyNamed(
+  () => import("@/features/departments/pages/departments-page"),
+  "DepartmentsPage"
 );
 
-const AuditsPage = lazy(() =>
-  import("@/features/audits/pages/audits-page").then((module) => ({
-    default: module.AuditsPage,
-  }))
+const PermissionsPage = lazyNamed(
+  () => import("@/features/permissions/pages/permissions-page"),
+  "PermissionsPage"
 );
 
-const PermissionDeniedPage = lazy(() =>
-  import("@/features/system/pages/permission-denied-page").then((module) => ({
-    default: module.PermissionDeniedPage,
-  }))
+const AuditsPage = lazyNamed(
+  () => import("@/features/audits/pages/audits-page"),
+  "AuditsPage"
 );
 
-const NotFoundPage = lazy(() =>
-  import("@/features/system/pages/not-found-page").then((module) => ({
-    default: module.NotFoundPage,
-  }))
+const ProfilePage = lazyNamed(
+  () => import("@/features/profile/pages/profile-page"),
+  "ProfilePage"
+);
+
+const SettingsPage = lazyNamed(
+  () => import("@/features/settings/pages/settings-page"),
+  "SettingsPage"
+);
+
+const PermissionDeniedPage = lazyNamed(
+  () => import("@/features/system/pages/permission-denied-page"),
+  "PermissionDeniedPage"
+);
+
+const NotFoundPage = lazyNamed(
+  () => import("@/features/system/pages/not-found-page"),
+  "NotFoundPage"
 );
 
 function AuthBootstrap({ children }) {
@@ -133,16 +144,18 @@ export function AppRouter() {
                   </LazyPage>
                 }
               />
-
-              <Route
-                path={`${appConfig.routes.resetPassword}/:token`}
-                element={
-                  <LazyPage>
-                    <ResetPasswordPage />
-                  </LazyPage>
-                }
-              />
             </Route>
+          </Route>
+
+          <Route element={<AuthLayout />}>
+            <Route
+              path={`${appConfig.routes.resetPassword}/:token`}
+              element={
+                <LazyPage>
+                  <ResetPasswordPage />
+                </LazyPage>
+              }
+            />
           </Route>
 
           <Route element={<ProtectedRoute />}>
@@ -152,6 +165,24 @@ export function AppRouter() {
                 element={
                   <LazyPage>
                     <DashboardPage />
+                  </LazyPage>
+                }
+              />
+
+              <Route
+                path={appConfig.routes.profile}
+                element={
+                  <LazyPage>
+                    <ProfilePage />
+                  </LazyPage>
+                }
+              />
+
+              <Route
+                path={appConfig.routes.settings}
+                element={
+                  <LazyPage>
+                    <SettingsPage />
                   </LazyPage>
                 }
               />
@@ -177,6 +208,19 @@ export function AppRouter() {
                   element={
                     <LazyPage>
                       <RolesPage />
+                    </LazyPage>
+                  }
+                />
+              </Route>
+
+              <Route
+                element={<PermissionRoute permissions={[PERMISSIONS.GROUP.READ]} />}
+              >
+                <Route
+                  path={appConfig.routes.groups}
+                  element={
+                    <LazyPage>
+                      <GroupsPage />
                     </LazyPage>
                   }
                 />
