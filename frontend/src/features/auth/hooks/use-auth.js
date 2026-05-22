@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+
 import { authApi } from "@/features/auth/api/auth.api";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { queryClient } from "@/lib/query/query-client";
@@ -12,9 +13,6 @@ export const AUTH_QUERY_KEYS = {
 };
 
 export const useCurrentUserQuery = () => {
-  const setUser = useAuthStore((state) => state.setUser);
-  const clearUser = useAuthStore((state) => state.clearUser);
-
   return useQuery({
     queryKey: AUTH_QUERY_KEYS.me,
     queryFn: async () => {
@@ -25,12 +23,6 @@ export const useCurrentUserQuery = () => {
     refetchOnMount: true,
     refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000,
-    onSuccess: (user) => {
-      setUser(user);
-    },
-    onError: () => {
-      clearUser();
-    },
   });
 };
 
@@ -46,13 +38,18 @@ export const useLoginMutation = () => {
       setUser(user);
       queryClient.setQueryData(AUTH_QUERY_KEYS.me, user);
 
-      toast.success("Login successful");
+      toast.success("Login successful", {
+        id: "login-success",
+      });
+
       navigate(appConfig.routes.dashboard, {
         replace: true,
       });
     },
     onError: (error) => {
-      toast.error(getApiErrorMessage(error, "Login failed"));
+      toast.error(getApiErrorMessage(error, "Login failed"), {
+        id: "login-error",
+      });
     },
   });
 };
@@ -67,7 +64,10 @@ export const useLogoutMutation = () => {
       clearUser();
       queryClient.clear();
 
-      toast.success("Logout successful");
+      toast.success("Logout successful", {
+        id: "logout-success",
+      });
+
       navigate(appConfig.routes.login, {
         replace: true,
       });
@@ -76,7 +76,10 @@ export const useLogoutMutation = () => {
       clearUser();
       queryClient.clear();
 
-      toast.error(getApiErrorMessage(error, "Logout failed"));
+      toast.error(getApiErrorMessage(error, "Logout failed"), {
+        id: "logout-error",
+      });
+
       navigate(appConfig.routes.login, {
         replace: true,
       });
@@ -89,14 +92,20 @@ export const useForgotPasswordMutation = () => {
     mutationFn: authApi.forgotPassword,
     onSuccess: (data) => {
       if (data?.previewUrl) {
-        toast.success("Reset link generated. Check the preview URL in response.");
+        toast.success("Reset link generated. Check the preview URL in response.", {
+          id: "forgot-password-preview",
+        });
         return;
       }
 
-      toast.success("If an active account exists, reset instructions have been sent.");
+      toast.success("If an active account exists, reset instructions have been sent.", {
+        id: "forgot-password-success",
+      });
     },
     onError: (error) => {
-      toast.error(getApiErrorMessage(error, "Unable to process request"));
+      toast.error(getApiErrorMessage(error, "Unable to process request"), {
+        id: "forgot-password-error",
+      });
     },
   });
 };
@@ -107,13 +116,18 @@ export const useResetPasswordMutation = () => {
   return useMutation({
     mutationFn: authApi.resetPassword,
     onSuccess: () => {
-      toast.success("Password reset successful. Please login.");
+      toast.success("Password reset successful. Please login.", {
+        id: "reset-password-success",
+      });
+
       navigate(appConfig.routes.login, {
         replace: true,
       });
     },
     onError: (error) => {
-      toast.error(getApiErrorMessage(error, "Unable to reset password"));
+      toast.error(getApiErrorMessage(error, "Unable to reset password"), {
+        id: "reset-password-error",
+      });
     },
   });
 };
