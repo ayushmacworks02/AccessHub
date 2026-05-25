@@ -84,6 +84,7 @@ export function RolesTable({ roles = [] }) {
         sortBy: columnKey,
         sortOrder: sortOrder === "asc" ? "desc" : "asc",
       });
+
       return;
     }
 
@@ -95,7 +96,7 @@ export function RolesTable({ roles = [] }) {
 
   if (!roles.length) {
     return (
-      <div className="p-6">
+      <div className="feature-table-empty">
         <EmptyState
           title="No roles found"
           description="Create your first role or adjust the current filters."
@@ -113,7 +114,7 @@ export function RolesTable({ roles = [] }) {
   }
 
   return (
-    <div className="feature-table-wrap">
+    <div className="feature-table-wrap scrollbar-soft">
       <table className="feature-table min-w-[1120px]">
         <thead className="feature-table-head">
           <tr>
@@ -122,10 +123,11 @@ export function RolesTable({ roles = [] }) {
                 {column.sortable ? (
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
+                    className="table-sort-button"
                     onClick={() => handleSort(column.key)}
                   >
                     <span>{column.label}</span>
+
                     {sortBy === column.key ? (
                       sortOrder === "asc" ? (
                         <ArrowDownAZ className="size-3.5" />
@@ -140,11 +142,11 @@ export function RolesTable({ roles = [] }) {
               </th>
             ))}
 
-            <th className="feature-th w-16 text-right">Actions</th>
+            <th className="feature-th table-action-cell">Actions</th>
           </tr>
         </thead>
 
-        <tbody className="divide-y">
+        <tbody>
           {roles.map((role) => {
             const isSystemRole = Boolean(role.isSystemRole);
             const canShowEdit = canUpdate && !isSystemRole;
@@ -152,10 +154,12 @@ export function RolesTable({ roles = [] }) {
             const canShowPermissions = canAssignPermission;
 
             return (
-              <tr key={role._id} className="transition-colors hover:bg-muted/30">
+              <tr key={role._id}>
                 <td className="feature-td">
                   <div className="flex min-w-0 items-center gap-2">
-                    <p className="table-primary-text font-medium">{role.name}</p>
+                    <p className="table-primary-text font-medium">
+                      {role.name}
+                    </p>
 
                     {isSystemRole ? (
                       <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
@@ -195,10 +199,15 @@ export function RolesTable({ roles = [] }) {
                   {formatDateTime(role.createdAt)}
                 </td>
 
-                <td className="feature-td text-right">
+                <td className="feature-td table-action-cell">
                   <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
-                      <Button type="button" variant="ghost" size="icon" className="size-8">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                      >
                         <MoreHorizontal className="size-4" />
                         <span className="sr-only">Open actions</span>
                       </Button>

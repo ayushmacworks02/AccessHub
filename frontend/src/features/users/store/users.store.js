@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+const RESET_LINK_RECOVERY_MINUTES = 15;
+
 const initialFilters = {
   search: "",
   status: "all",
@@ -41,6 +43,8 @@ const previewEmptyState = {
   previewUrl: "",
   messageId: "",
   status: "idle",
+  expiresAt: null,
+  recoverable: false,
 };
 
 const getEntityId = (entity) => {
@@ -76,7 +80,23 @@ const buildRolesDraft = (user) => ({
     : [],
 });
 
-export const useUsersStore = create((set) => ({
+const getDefaultResetLinkExpiresAt = () => {
+  const expiresAt = new Date();
+
+  expiresAt.setMinutes(expiresAt.getMinutes() + RESET_LINK_RECOVERY_MINUTES);
+
+  return expiresAt.toISOString();
+};
+
+const isPreviewStillRecoverable = (dialog) => {
+  if (!dialog?.recoverable || !dialog?.previewUrl || !dialog?.expiresAt) {
+    return false;
+  }
+
+  return new Date(dialog.expiresAt).getTime() > Date.now();
+};
+
+export const useUsersStore = create((set, get) => ({
   ...initialFilters,
 
   formDialogOpen: false,
@@ -97,6 +117,12 @@ export const useUsersStore = create((set) => ({
   userToDelete: null,
 
   emailPreviewDialog: previewEmptyState,
+
+  resetEmailRequestPending: false,
+  resetEmailRequestUserId: "",
+
+  resetEmailCooldownUserId: "",
+  resetEmailCooldownExpiresAt: null,
 
   setSearch: (search) => {
     set({
@@ -132,6 +158,14 @@ export const useUsersStore = create((set) => ({
     });
   },
 
+  setSort: ({ sortBy, sortOrder }) => {
+    set({
+      sortBy,
+      sortOrder,
+      page: 1,
+    });
+  },
+
   setSorting: ({ sortBy, sortOrder }) => {
     set({
       sortBy,
@@ -141,7 +175,9 @@ export const useUsersStore = create((set) => ({
   },
 
   resetFilters: () => {
-    set(initialFilters);
+    set({
+      ...initialFilters,
+    });
   },
 
   openCreateDialog: () => {
@@ -149,7 +185,6 @@ export const useUsersStore = create((set) => ({
       formDialogOpen: true,
       formMode: "create",
       selectedUser: null,
-      createDraft: buildCreateDraft(),
     });
   },
 
@@ -275,12 +310,41 @@ export const useUsersStore = create((set) => ({
     });
   },
 
+  startResetEmailRequest: (userId) => {
+    set({
+      resetEmailRequestPending: true,
+      resetEmailRequestUserId: userId || "",
+    });
+  },
+
+  finishResetEmailRequest: () => {
+    set({
+      resetEmailRequestPending: false,
+      resetEmailRequestUserId: "",
+    });
+  },
+
+  activateResetEmailCooldown: ({ userId, expiresAt }) => {
+    set({
+      resetEmailCooldownUserId: userId || "",
+      resetEmailCooldownExpiresAt: expiresAt || getDefaultResetLinkExpiresAt(),
+    });
+  },
+
+  clearResetEmailCooldown: () => {
+    set({
+      resetEmailCooldownUserId: "",
+      resetEmailCooldownExpiresAt: null,
+    });
+  },
+
   openEmailPreviewDialog: (payload = {}) => {
     set({
       emailPreviewDialog: {
         ...previewEmptyState,
-        open: true,
         ...payload,
+        open: true,
+        expiresAt: payload.expiresAt || null,
       },
     });
   },
@@ -295,9 +359,53 @@ export const useUsersStore = create((set) => ({
     }));
   },
 
-  closeEmailPreviewDialog: () => {
+  hideEmailPreviewDialog: () => {
+    const currentDialog = get().emailPreviewDialog;
+
+    if (isPreviewStillRecoverable(currentDialog)) {
+      set({
+        emailPreviewDialog: {
+          ...currentDialog,
+          open: false,
+        },
+      });
+
+      return;
+    }
+
     set({
       emailPreviewDialog: previewEmptyState,
     });
   },
+
+  reopenEmailPreviewDialog: () => {
+    const currentDialog = get().emailPreviewDialog;
+
+    if (!isPreviewStillRecoverable(currentDialog)) {
+      set({
+        emailPreviewDialog: previewEmptyState,
+      });
+
+      return;
+    }
+
+    set({
+      emailPreviewDialog: {
+        ...currentDialog,
+        open: true,
+      },
+    });
+  },
+
+  clearEmailPreviewDialog: () => {
+    set({
+      emailPreviewDialog: previewEmptyState,
+      resetEmailRequestPending: false,
+      resetEmailRequestUserId: "",
+      resetEmailCooldownUserId: "",
+      resetEmailCooldownExpiresAt: null,
+    });
+  },
+
+  getDefaultResetLinkExpiresAt,
 }));

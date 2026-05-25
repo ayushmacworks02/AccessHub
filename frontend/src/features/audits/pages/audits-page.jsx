@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { RotateCcw, Search } from "lucide-react";
 
 import { AuditDetailDialog } from "@/features/audits/components/audit-detail-dialog";
 import { AuditsTable } from "@/features/audits/components/audits-table";
@@ -9,6 +9,7 @@ import { ErrorState } from "@/components/common/error-state";
 import { PageHeader } from "@/components/common/page-header";
 import { PaginationControls } from "@/components/common/pagination-controls";
 import { TableSkeleton } from "@/components/loaders/table-skeleton";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -35,11 +36,22 @@ export function AuditsPage() {
   const setResource = useAuditsStore((state) => state.setResource);
   const setPage = useAuditsStore((state) => state.setPage);
   const setLimit = useAuditsStore((state) => state.setLimit);
+  const resetFilters = useAuditsStore((state) => state.resetFilters);
 
   const auditsQuery = useAuditsQuery();
 
   const audits = auditsQuery.data?.audits || [];
   const pagination = auditsQuery.data?.pagination;
+  const filters = auditsQuery.data?.filters || {};
+
+  const actionOptions = Array.isArray(filters.actions) ? filters.actions : [];
+  const resourceOptions = Array.isArray(filters.resources)
+    ? filters.resources
+    : [];
+
+  const handleResetFilters = () => {
+    resetFilters();
+  };
 
   return (
     <div className="space-y-5">
@@ -58,50 +70,71 @@ export function AuditsPage() {
               </p>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-[1fr_160px_160px] xl:w-[680px]">
+            <div className="grid gap-2 sm:grid-cols-[1fr_150px_160px_auto] xl:w-[760px]">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search audit logs..."
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Search audits..."
                   className="h-10 pl-9"
                 />
               </div>
 
-              <Select value={action} onValueChange={setAction}>
+              <Select
+                value={action}
+                onValueChange={(value) => {
+                  setAction(value);
+                  setPage(1);
+                }}
+              >
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Action" />
                 </SelectTrigger>
 
                 <SelectContent>
                   <SelectItem value="all">All actions</SelectItem>
-                  <SelectItem value="CREATE">Create</SelectItem>
-                  <SelectItem value="UPDATE">Update</SelectItem>
-                  <SelectItem value="DELETE">Delete</SelectItem>
-                  <SelectItem value="LOGIN_SUCCESS">Login</SelectItem>
-                  <SelectItem value="LOGOUT_SUCCESS">Logout</SelectItem>
-                  <SelectItem value="PASSWORD_RESET_SUCCESS">
-                    Password reset
-                  </SelectItem>
+                  {actionOptions.map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {String(item).replaceAll("_", " ")}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
-              <Select value={resource} onValueChange={setResource}>
+              <Select
+                value={resource}
+                onValueChange={(value) => {
+                  setResource(value);
+                  setPage(1);
+                }}
+              >
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Resource" />
                 </SelectTrigger>
 
                 <SelectContent>
                   <SelectItem value="all">All resources</SelectItem>
-                  <SelectItem value="AUTH">Auth</SelectItem>
-                  <SelectItem value="USER">User</SelectItem>
-                  <SelectItem value="ROLE">Role</SelectItem>
-                  <SelectItem value="GROUP">Group</SelectItem>
-                  <SelectItem value="DEPARTMENT">Department</SelectItem>
-                  <SelectItem value="PERMISSION">Permission</SelectItem>
+                  {resourceOptions.map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {String(item).replaceAll("_", " ")}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResetFilters}
+                className="h-10"
+              >
+                <RotateCcw className="size-4" />
+                Reset
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -109,7 +142,7 @@ export function AuditsPage() {
         <CardContent className="p-0">
           {auditsQuery.isLoading ? (
             <div className="p-4">
-              <TableSkeleton rows={8} columns={5} />
+              <TableSkeleton rows={8} columns={7} />
             </div>
           ) : auditsQuery.isError ? (
             <div className="p-4">
@@ -122,12 +155,15 @@ export function AuditsPage() {
             <AuditsTable audits={audits} />
           )}
 
-          {!auditsQuery.isLoading && !auditsQuery.isError ? (
+          {!auditsQuery.isLoading && !auditsQuery.isError && audits.length ? (
             <PaginationControls
               pagination={pagination}
               limit={limit}
               onPageChange={setPage}
-              onLimitChange={setLimit}
+              onLimitChange={(nextLimit) => {
+                setLimit(nextLimit);
+                setPage(1);
+              }}
             />
           ) : null}
         </CardContent>

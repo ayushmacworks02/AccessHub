@@ -20,9 +20,12 @@ export function AppDialogContent({
   className,
   size = "md",
   fixedHeight = false,
+  showCloseButton = true,
+  ...props
 }) {
   return (
     <DialogContent
+      showCloseButton={showCloseButton}
       className={cn(
         "gap-0 overflow-hidden p-0 shadow-xl ring-1 ring-border/80",
         "w-[calc(100vw-1.5rem)]",
@@ -30,6 +33,7 @@ export function AppDialogContent({
         sizeClassMap[size] || sizeClassMap.md,
         className
       )}
+      {...props}
     >
       {children}
     </DialogContent>
@@ -40,6 +44,7 @@ export function AppDialogHeader({
   title,
   description,
   icon: Icon,
+  iconClassName,
   className,
 }) {
   return (
@@ -52,7 +57,7 @@ export function AppDialogHeader({
       <div className="flex items-start gap-3 pr-8">
         {Icon ? (
           <div className="hidden size-9 shrink-0 items-center justify-center rounded-xl border bg-muted/60 sm:flex">
-            <Icon className="size-4 text-muted-foreground" />
+            <Icon className={cn("size-4 text-muted-foreground", iconClassName)} />
           </div>
         ) : null}
 

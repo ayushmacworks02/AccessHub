@@ -1,4 +1,4 @@
-import { Plus, Search } from "lucide-react";
+import { Plus, RotateCcw, Search } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { ErrorState } from "@/components/common/error-state";
@@ -46,7 +46,10 @@ export function DepartmentsPage() {
   const setStatus = useDepartmentsStore((state) => state.setStatus);
   const setPage = useDepartmentsStore((state) => state.setPage);
   const setLimit = useDepartmentsStore((state) => state.setLimit);
-  const openCreateDialog = useDepartmentsStore((state) => state.openCreateDialog);
+  const resetFilters = useDepartmentsStore((state) => state.resetFilters);
+  const openCreateDialog = useDepartmentsStore(
+    (state) => state.openCreateDialog
+  );
   const closeDeleteDialog = useDepartmentsStore(
     (state) => state.closeDeleteDialog
   );
@@ -69,11 +72,15 @@ export function DepartmentsPage() {
     deleteDepartmentMutation.mutate(departmentToDelete._id);
   };
 
+  const handleResetFilters = () => {
+    resetFilters();
+  };
+
   return (
     <div className="space-y-5">
       <PageHeader
         title="Departments"
-        description="Organize users and roles into departments."
+        description="Manage business units used for ownership and access assignment."
         actions={
           canCreate ? (
             <Button type="button" onClick={openCreateDialog}>
@@ -90,22 +97,31 @@ export function DepartmentsPage() {
             <div className="min-w-0">
               <CardTitle className="text-base">Department directory</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                Maintain department records used across users and roles.
+                Search departments and filter by status.
               </p>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-[1fr_150px] xl:w-[520px]">
+            <div className="grid gap-2 sm:grid-cols-[1fr_150px_auto] xl:w-[620px]">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
                   placeholder="Search departments..."
                   className="h-10 pl-9"
                 />
               </div>
 
-              <Select value={status} onValueChange={setStatus}>
+              <Select
+                value={status}
+                onValueChange={(value) => {
+                  setStatus(value);
+                  setPage(1);
+                }}
+              >
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -116,6 +132,16 @@ export function DepartmentsPage() {
                   <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResetFilters}
+                className="h-10"
+              >
+                <RotateCcw className="size-4" />
+                Reset
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -123,7 +149,7 @@ export function DepartmentsPage() {
         <CardContent className="p-0">
           {departmentsQuery.isLoading ? (
             <div className="p-4">
-              <TableSkeleton rows={8} columns={5} />
+              <TableSkeleton rows={8} columns={6} />
             </div>
           ) : departmentsQuery.isError ? (
             <div className="p-4">
@@ -136,12 +162,17 @@ export function DepartmentsPage() {
             <DepartmentsTable departments={departments} />
           )}
 
-          {!departmentsQuery.isLoading && !departmentsQuery.isError ? (
+          {!departmentsQuery.isLoading &&
+          !departmentsQuery.isError &&
+          departments.length ? (
             <PaginationControls
               pagination={pagination}
               limit={limit}
               onPageChange={setPage}
-              onLimitChange={setLimit}
+              onLimitChange={(nextLimit) => {
+                setLimit(nextLimit);
+                setPage(1);
+              }}
             />
           ) : null}
         </CardContent>
@@ -151,7 +182,11 @@ export function DepartmentsPage() {
 
       <ConfirmDialog
         open={deleteDialogOpen}
-        onOpenChange={closeDeleteDialog}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            closeDeleteDialog();
+          }
+        }}
         title="Delete department?"
         description={
           departmentToDelete

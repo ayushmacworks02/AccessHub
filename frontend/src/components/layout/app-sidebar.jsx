@@ -1,11 +1,13 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronRight,
   LayoutDashboard,
   LogOut,
+  PanelRightOpen,
   Settings,
   Shield,
   UserCircle,
+  X,
 } from "lucide-react";
 
 import { appNavigationRoutes } from "@/routes/routes";
@@ -103,13 +105,33 @@ const groupRoutes = (routes = []) => {
   return Object.entries(groups).filter(([, items]) => items.length > 0);
 };
 
+const normalizePath = (path = "") => {
+  if (!path || path === "/") {
+    return "/";
+  }
+
+  return path.replace(/\/+$/, "");
+};
+
+const isRouteActive = ({ currentPath, routePath }) => {
+  const current = normalizePath(currentPath);
+  const target = normalizePath(routePath);
+
+  if (!target || target === "/") {
+    return current === "/";
+  }
+
+  return current === target || current.startsWith(`${target}/`);
+};
+
 export function AppSidebar() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const user = useAuthStore((state) => state.user);
   const logoutMutation = useLogoutMutation();
 
-  const { state, isMobile, setOpenMobile } = useSidebar();
+  const { state, isMobile, setOpen, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
 
   const visibleRoutes = appNavigationRoutes.filter((route) =>
@@ -124,6 +146,24 @@ export function AppSidebar() {
     }
   };
 
+  const handleBrandClick = () => {
+    if (isMobile) {
+      return;
+    }
+
+    if (isCollapsed) {
+      setOpen(true);
+      return;
+    }
+
+    navigate(appConfig.routes.dashboard);
+  };
+
+  const handleMobileBrandTitleClick = () => {
+    navigate(appConfig.routes.dashboard);
+    closeMobileSidebar();
+  };
+
   const handleNavigate = (path) => {
     navigate(path);
     closeMobileSidebar();
@@ -133,37 +173,89 @@ export function AppSidebar() {
     <Sidebar
       collapsible="icon"
       variant="sidebar"
-      className="border-r border-sidebar-border bg-sidebar"
+      className="border-r-0 bg-sidebar"
     >
       <SidebarHeader className="border-b border-sidebar-border p-3 group-data-[collapsible=icon]:px-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              tooltip={appConfig.name}
-              onClick={() => handleNavigate(appConfig.routes.dashboard)}
-              className={cn(
-                "h-12 rounded-2xl px-3",
-                "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                "group-data-[collapsible=icon]:mx-auto",
-                "group-data-[collapsible=icon]:size-11",
-                "group-data-[collapsible=icon]:justify-center",
-                "group-data-[collapsible=icon]:p-0"
-              )}
-            >
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
-                <Shield className="size-4" />
-              </div>
+            <div className="relative">
+              <SidebarMenuButton
+                size="lg"
+                tooltip={
+                  isCollapsed && !isMobile
+                    ? `Expand ${appConfig.name || "NxAuth"} sidebar`
+                    : appConfig.name
+                }
+                onClick={handleBrandClick}
+                className={cn(
+                  "group/brand relative h-12 rounded-2xl px-3",
+                  "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  "group-data-[collapsible=icon]:mx-auto",
+                  "group-data-[collapsible=icon]:size-11",
+                  "group-data-[collapsible=icon]:justify-center",
+                  "group-data-[collapsible=icon]:p-0"
+                )}
+              >
+                <div className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
+                  <Shield
+                    className={cn(
+                      "size-4 transition-all duration-150",
+                      isCollapsed &&
+                        !isMobile &&
+                        "group-hover/brand:scale-75 group-hover/brand:opacity-15"
+                    )}
+                  />
 
-              <div className="grid min-w-0 flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
-                <span className="truncate text-sm font-semibold">
-                  {appConfig.name}
-                </span>
-                <span className="truncate text-xs text-sidebar-foreground/60">
-                  Auth & RBAC Console
-                </span>
-              </div>
-            </SidebarMenuButton>
+                  {isCollapsed && !isMobile ? (
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "absolute inset-0 hidden items-center justify-center",
+                        "bg-sidebar-primary text-sidebar-primary-foreground",
+                        "opacity-0 transition-all duration-150",
+                        "group-hover/brand:flex group-hover/brand:opacity-100"
+                      )}
+                    >
+                      <PanelRightOpen className="size-5" />
+                    </span>
+                  ) : null}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleMobileBrandTitleClick();
+                  }}
+                  className={cn(
+                    "grid min-w-0 flex-1 text-left leading-tight",
+                    "group-data-[collapsible=icon]:hidden"
+                  )}
+                >
+                  <span className="truncate text-sm font-semibold">
+                    {appConfig.name}
+                  </span>
+                  <span className="truncate text-xs text-sidebar-foreground/60">
+                    Auth & RBAC Console
+                  </span>
+                </button>
+              </SidebarMenuButton>
+
+              <button
+                type="button"
+                aria-label="Close sidebar"
+                title="Close sidebar"
+                onClick={() => setOpenMobile(false)}
+                className={cn(
+                  "absolute right-2 top-1/2 hidden size-8 -translate-y-1/2 items-center justify-center rounded-xl",
+                  "text-sidebar-foreground/70 transition-colors",
+                  "hover:bg-sidebar-hover hover:text-sidebar-hover-foreground",
+                  isMobile && "inline-flex"
+                )}
+              >
+                <X className="size-4" />
+              </button>
+            </div>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -182,34 +274,42 @@ export function AppSidebar() {
               <SidebarMenu className="gap-1">
                 {routes.map((route) => {
                   const Icon = route.icon || LayoutDashboard;
+                  const active = isRouteActive({
+                    currentPath: location.pathname,
+                    routePath: route.path,
+                  });
 
                   return (
                     <SidebarMenuItem key={route.path}>
-                      <NavLink to={route.path} onClick={closeMobileSidebar}>
-                        {({ isActive }) => (
-                          <SidebarMenuButton
-                            isActive={isActive}
-                            tooltip={route.title}
-                            className={cn(
-                              "h-10 rounded-xl px-3 text-sm font-medium",
-                              "transition-colors duration-150",
-                              "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                              "data-[active=true]:bg-sidebar-accent",
-                              "data-[active=true]:text-sidebar-accent-foreground",
-                              "data-[active=true]:shadow-sm",
-                              "group-data-[collapsible=icon]:mx-auto",
-                              "group-data-[collapsible=icon]:size-10",
-                              "group-data-[collapsible=icon]:justify-center",
-                              "group-data-[collapsible=icon]:p-0"
-                            )}
-                          >
-                            <Icon className="size-4 shrink-0" />
-                            <span className="truncate group-data-[collapsible=icon]:hidden">
-                              {route.title}
-                            </span>
-                          </SidebarMenuButton>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        tooltip={route.title}
+                        className={cn(
+                          "h-10 rounded-xl px-3 text-sm font-medium",
+                          "transition-colors duration-150",
+                          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                          active &&
+                            "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm",
+                          "group-data-[collapsible=icon]:mx-auto",
+                          "group-data-[collapsible=icon]:size-10",
+                          "group-data-[collapsible=icon]:justify-center",
+                          "group-data-[collapsible=icon]:p-0"
                         )}
-                      </NavLink>
+                      >
+                        <NavLink
+                          to={route.path}
+                          end
+                          onClick={closeMobileSidebar}
+                          className="flex min-w-0 items-center gap-2"
+                        >
+                          <Icon className="size-4 shrink-0" />
+
+                          <span className="truncate group-data-[collapsible=icon]:hidden">
+                            {route.title}
+                          </span>
+                        </NavLink>
+                      </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
                 })}

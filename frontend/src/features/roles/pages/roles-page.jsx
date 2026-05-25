@@ -1,4 +1,4 @@
-import { Plus, Search } from "lucide-react";
+import { Plus, RotateCcw, Search } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { ErrorState } from "@/components/common/error-state";
@@ -46,6 +46,7 @@ export function RolesPage() {
   const setDepartment = useRolesStore((state) => state.setDepartment);
   const setPage = useRolesStore((state) => state.setPage);
   const setLimit = useRolesStore((state) => state.setLimit);
+  const resetFilters = useRolesStore((state) => state.resetFilters);
   const openCreateDialog = useRolesStore((state) => state.openCreateDialog);
   const closeDeleteDialog = useRolesStore((state) => state.closeDeleteDialog);
 
@@ -69,11 +70,15 @@ export function RolesPage() {
     deleteRoleMutation.mutate(roleToDelete._id);
   };
 
+  const handleResetFilters = () => {
+    resetFilters();
+  };
+
   return (
     <div className="space-y-5">
       <PageHeader
         title="Roles"
-        description="Manage reusable permission bundles for RBAC."
+        description="Manage role definitions and permission mappings."
         actions={
           canCreate ? (
             <Button type="button" onClick={openCreateDialog}>
@@ -90,22 +95,31 @@ export function RolesPage() {
             <div className="min-w-0">
               <CardTitle className="text-base">Role directory</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                Create roles and assign permissions from one place.
+                Search roles and filter by status or department.
               </p>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-[1fr_150px_180px] xl:w-[680px]">
+            <div className="grid gap-2 sm:grid-cols-[1fr_150px_170px_auto] xl:w-[760px]">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
                   placeholder="Search roles..."
                   className="h-10 pl-9"
                 />
               </div>
 
-              <Select value={status} onValueChange={setStatus}>
+              <Select
+                value={status}
+                onValueChange={(value) => {
+                  setStatus(value);
+                  setPage(1);
+                }}
+              >
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -117,7 +131,13 @@ export function RolesPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={department} onValueChange={setDepartment}>
+              <Select
+                value={department}
+                onValueChange={(value) => {
+                  setDepartment(value);
+                  setPage(1);
+                }}
+              >
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Department" />
                 </SelectTrigger>
@@ -131,6 +151,16 @@ export function RolesPage() {
                   ))}
                 </SelectContent>
               </Select>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResetFilters}
+                className="h-10"
+              >
+                <RotateCcw className="size-4" />
+                Reset
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -138,7 +168,7 @@ export function RolesPage() {
         <CardContent className="p-0">
           {rolesQuery.isLoading ? (
             <div className="p-4">
-              <TableSkeleton rows={8} columns={5} />
+              <TableSkeleton rows={8} columns={7} />
             </div>
           ) : rolesQuery.isError ? (
             <div className="p-4">
@@ -151,12 +181,15 @@ export function RolesPage() {
             <RolesTable roles={roles} />
           )}
 
-          {!rolesQuery.isLoading && !rolesQuery.isError ? (
+          {!rolesQuery.isLoading && !rolesQuery.isError && roles.length ? (
             <PaginationControls
               pagination={pagination}
               limit={limit}
               onPageChange={setPage}
-              onLimitChange={setLimit}
+              onLimitChange={(nextLimit) => {
+                setLimit(nextLimit);
+                setPage(1);
+              }}
             />
           ) : null}
         </CardContent>
@@ -167,7 +200,11 @@ export function RolesPage() {
 
       <ConfirmDialog
         open={deleteDialogOpen}
-        onOpenChange={closeDeleteDialog}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            closeDeleteDialog();
+          }
+        }}
         title="Delete role?"
         description={
           roleToDelete

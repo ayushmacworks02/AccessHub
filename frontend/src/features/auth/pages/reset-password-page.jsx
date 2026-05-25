@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,17 +13,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { PasswordInput } from "@/components/forms/password-input";
 import { FormFieldWrapper } from "@/components/forms/form-field-wrapper";
 import { resetPasswordFormSchema } from "@/features/auth/schemas/auth.schema";
 import { useResetPasswordMutation } from "@/features/auth/hooks/use-auth";
+import { useUsersStore } from "@/features/users/store/users.store";
 import { appConfig } from "@/config/app.config";
 
 export function ResetPasswordPage() {
   const { token = "" } = useParams();
+
   const resetPasswordMutation = useResetPasswordMutation();
+
+  const clearEmailPreviewDialog = useUsersStore(
+    (state) => state.clearEmailPreviewDialog
+  );
 
   const form = useForm({
     resolver: zodResolver(resetPasswordFormSchema),
@@ -31,6 +38,10 @@ export function ResetPasswordPage() {
     },
     mode: "onTouched",
   });
+
+  useEffect(() => {
+    clearEmailPreviewDialog();
+  }, [clearEmailPreviewDialog]);
 
   const onSubmit = (values) => {
     resetPasswordMutation.mutate({
@@ -48,9 +59,7 @@ export function ResetPasswordPage() {
           {appConfig.name}
         </div>
 
-        <CardTitle className="text-xl sm:text-2xl">
-          Reset password
-        </CardTitle>
+        <CardTitle className="text-xl sm:text-2xl">Reset password</CardTitle>
 
         <CardDescription>
           Create a new secure password for your account.
@@ -113,7 +122,7 @@ export function ResetPasswordPage() {
 
             <Button
               type="submit"
-              className="w-full"
+              className="w-full gap-2"
               disabled={resetPasswordMutation.isPending}
             >
               {resetPasswordMutation.isPending ? (

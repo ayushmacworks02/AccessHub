@@ -4,12 +4,17 @@ import { useNavigate } from "react-router-dom";
 
 import { authApi } from "@/features/auth/api/auth.api";
 import { useAuthStore } from "@/features/auth/store/auth.store";
+import { useUsersStore } from "@/features/users/store/users.store";
 import { queryClient } from "@/lib/query/query-client";
 import { getApiErrorMessage } from "@/lib/api/api-response";
 import { appConfig } from "@/config/app.config";
 
 export const AUTH_QUERY_KEYS = {
   me: ["auth", "me"],
+};
+
+const clearResetEmailPreviewRecovery = () => {
+  useUsersStore.getState().clearEmailPreviewDialog?.();
 };
 
 export const useCurrentUserQuery = () => {
@@ -32,8 +37,11 @@ export const useLoginMutation = () => {
 
   return useMutation({
     mutationFn: authApi.login,
+
     onSuccess: (data) => {
       const user = data?.user || null;
+
+      clearResetEmailPreviewRecovery();
 
       setUser(user);
       queryClient.setQueryData(AUTH_QUERY_KEYS.me, user);
@@ -46,6 +54,7 @@ export const useLoginMutation = () => {
         replace: true,
       });
     },
+
     onError: (error) => {
       toast.error(getApiErrorMessage(error, "Login failed"), {
         id: "login-error",
@@ -60,7 +69,10 @@ export const useLogoutMutation = () => {
 
   return useMutation({
     mutationFn: authApi.logout,
+
     onSuccess: () => {
+      clearResetEmailPreviewRecovery();
+
       clearUser();
       queryClient.clear();
 
@@ -72,7 +84,10 @@ export const useLogoutMutation = () => {
         replace: true,
       });
     },
+
     onError: (error) => {
+      clearResetEmailPreviewRecovery();
+
       clearUser();
       queryClient.clear();
 
@@ -90,11 +105,13 @@ export const useLogoutMutation = () => {
 export const useForgotPasswordMutation = () => {
   return useMutation({
     mutationFn: authApi.forgotPassword,
+
     onSuccess: (data) => {
       if (data?.previewUrl) {
         toast.success("Reset link generated. Check the preview URL in response.", {
-          id: "forgot-password-preview",
+          id: "forgot-password-success",
         });
+
         return;
       }
 
@@ -102,8 +119,9 @@ export const useForgotPasswordMutation = () => {
         id: "forgot-password-success",
       });
     },
+
     onError: (error) => {
-      toast.error(getApiErrorMessage(error, "Unable to process request"), {
+      toast.error(getApiErrorMessage(error, "Unable to send reset link"), {
         id: "forgot-password-error",
       });
     },
@@ -112,16 +130,15 @@ export const useForgotPasswordMutation = () => {
 
 export const useResetPasswordMutation = () => {
   const navigate = useNavigate();
-
   const clearUser = useAuthStore((state) => state.clearUser);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useMutation({
     mutationFn: authApi.resetPassword,
-    onSuccess: (data) => {
-      const sessionCleared = Boolean(data?.sessionCleared);
 
-      if (sessionCleared) {
+    onSuccess: (data) => {
+      clearResetEmailPreviewRecovery();
+
+      if (data?.sessionCleared) {
         clearUser();
         queryClient.clear();
 
@@ -136,24 +153,52 @@ export const useResetPasswordMutation = () => {
         return;
       }
 
+      queryClient.invalidateQueries({
+        queryKey: AUTH_QUERY_KEYS.me,
+      });
+
       toast.success("Password reset successful.", {
         id: "reset-password-success",
       });
-
-      if (isAuthenticated) {
-        navigate(appConfig.routes.dashboard, {
-          replace: true,
-        });
-        return;
-      }
 
       navigate(appConfig.routes.login, {
         replace: true,
       });
     },
+
     onError: (error) => {
       toast.error(getApiErrorMessage(error, "Unable to reset password"), {
         id: "reset-password-error",
+      });
+    },
+  });
+};
+
+export const useLogoutAllMutation = () => {
+  const navigate = useNavigate();
+  const clearUser = useAuthStore((state) => state.clearUser);
+
+  return useMutation({
+    mutationFn: authApi.logoutAll,
+
+    onSuccess: () => {
+      clearResetEmailPreviewRecovery();
+
+      clearUser();
+      queryClient.clear();
+
+      toast.success("Logged out from all devices", {
+        id: "logout-all-success",
+      });
+
+      navigate(appConfig.routes.login, {
+        replace: true,
+      });
+    },
+
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, "Unable to logout from all devices"), {
+        id: "logout-all-error",
       });
     },
   });

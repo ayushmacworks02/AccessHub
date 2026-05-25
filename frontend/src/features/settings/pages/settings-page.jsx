@@ -18,8 +18,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useForgotPasswordMutation } from "@/features/auth/hooks/use-auth";
+import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useThemeStore } from "@/stores/theme.store";
 
 export function SettingsPage() {
@@ -51,100 +51,170 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="feature-page">
       <PageHeader
         title="Settings"
         description="Manage your account security, reset password email preview, and interface preferences."
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        <div className="space-y-6">
-          <Card className="border-border/80">
-            <CardHeader className="border-b bg-muted/20">
+      <div className="grid gap-5 xl:grid-cols-[1fr_380px]">
+        <div className="space-y-5">
+          <Card className="feature-card">
+            <CardHeader className="feature-card-header">
               <CardTitle className="flex items-center gap-2 text-base">
                 <KeyRound className="size-4 text-muted-foreground" />
                 Password reset
               </CardTitle>
             </CardHeader>
 
-            <CardContent className="space-y-5 p-4 sm:p-6">
-              <div className="rounded-xl border bg-muted/20 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border bg-background">
-                    <Mail className="size-4 text-muted-foreground" />
-                  </div>
+            <CardContent className="p-0">
+              <div className="space-y-4 p-4 sm:p-5">
+                <div className="rounded-xl border bg-background p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border bg-muted">
+                      <Mail className="size-4 text-muted-foreground" />
+                    </div>
 
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">
-                      Send reset password email to my account
-                    </p>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      A reset password link will be sent to your registered
-                      email address. In demo mode, the Ethereal preview URL will
-                      appear below.
-                    </p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">
+                        Send password reset email
+                      </p>
 
-                    <div className="mt-4">
-                      <Button
-                        type="button"
-                        onClick={handleSendOwnResetEmail}
-                        disabled={
-                          forgotPasswordMutation.isPending || !user?.email
-                        }
-                      >
-                        {forgotPasswordMutation.isPending ? (
-                          <>
-                            <Loader2 className="size-4 animate-spin" />
-                            Sending reset email...
-                          </>
-                        ) : (
-                          <>
-                            <Mail className="size-4" />
-                            Send reset email
-                          </>
-                        )}
-                      </Button>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        Generate a reset password email for your own account.
+                        In demo mode, the Ethereal email preview link will be
+                        shown here.
+                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {forgotPasswordMutation.isSuccess ? (
-                <Alert>
-                  <ShieldCheck className="size-4" />
-                  <AlertTitle>Reset request processed</AlertTitle>
-                  <AlertDescription>
-                    If your account is active, a password reset email has been
-                    generated for {user?.email}.
-                  </AlertDescription>
-                </Alert>
-              ) : null}
+                {forgotPasswordMutation.isPending ? (
+                  <Alert>
+                    <Loader2 className="size-4 animate-spin" />
+                    <AlertTitle>Sending reset email</AlertTitle>
+                    <AlertDescription>
+                      Please wait while the reset email is generated.
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
 
-              {previewUrl ? (
-                <div className="rounded-xl border bg-muted/20 p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Ethereal preview URL
-                  </p>
+                {forgotPasswordMutation.isSuccess ? (
+                  <Alert>
+                    <Mail className="size-4" />
+                    <AlertTitle>Reset request processed</AlertTitle>
+                    <AlertDescription>
+                      If an active account exists with this email, a password
+                      reset link has been generated.
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
 
-                  <p className="mt-2 break-all text-sm leading-6">
-                    {previewUrl}
-                  </p>
-
-                  <Button
-                    type="button"
-                    className="mt-4"
-                    onClick={handleOpenPreview}
-                  >
+                {previewUrl ? (
+                  <Alert>
                     <ExternalLink className="size-4" />
-                    Open email preview
-                  </Button>
-                </div>
-              ) : null}
+                    <AlertTitle>Ethereal preview available</AlertTitle>
+                    <AlertDescription>
+                      <button
+                        type="button"
+                        onClick={handleOpenPreview}
+                        className="font-medium underline underline-offset-4"
+                      >
+                        Open reset email preview
+                      </button>
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
+
+                <Button
+                  type="button"
+                  onClick={handleSendOwnResetEmail}
+                  disabled={forgotPasswordMutation.isPending || !user?.email}
+                >
+                  {forgotPasswordMutation.isPending ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Sending reset email...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="size-4" />
+                      Send reset email
+                    </>
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="border-border/80">
-            <CardHeader className="border-b bg-muted/20">
+          <Card className="feature-card">
+            <CardHeader className="feature-card-header">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldCheck className="size-4 text-muted-foreground" />
+                Security note
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              <div className="p-4 sm:p-5">
+                <div className="rounded-xl border bg-background p-4">
+                  <p className="text-sm font-medium">
+                    Reset links are time bound
+                  </p>
+
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    Password reset links expire after the configured reset token
+                    duration. Once used, old links cannot be reused.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-5">
+          <Card className="feature-card">
+            <CardHeader className="feature-card-header">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <UserCircle className="size-4 text-muted-foreground" />
+                Account
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              <div className="space-y-3 p-4 sm:p-5">
+                <div className="rounded-xl border bg-background p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Name
+                  </p>
+                  <p className="mt-1 table-primary-text font-medium">
+                    {user?.name || "-"}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border bg-background p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Email
+                  </p>
+                  <p className="mt-1 table-secondary-text font-medium">
+                    {user?.email || "-"}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border bg-background p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Account type
+                  </p>
+                  <p className="mt-1 font-medium">
+                    {user?.isSuperAdmin ? "Super Admin" : "Standard User"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="feature-card">
+            <CardHeader className="feature-card-header">
               <CardTitle className="flex items-center gap-2 text-base">
                 {isDark ? (
                   <Moon className="size-4 text-muted-foreground" />
@@ -155,12 +225,15 @@ export function SettingsPage() {
               </CardTitle>
             </CardHeader>
 
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex flex-col gap-4 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-medium">Theme</p>
+            <CardContent className="p-0">
+              <div className="space-y-4 p-4 sm:p-5">
+                <div className="rounded-xl border bg-background p-4">
+                  <p className="text-sm font-medium">
+                    Current theme: {isDark ? "Dark" : "Light"}
+                  </p>
+
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    Current theme is {isDark ? "dark" : "light"} mode.
+                    Toggle the interface theme for your current browser.
                   </p>
                 </div>
 
@@ -168,12 +241,12 @@ export function SettingsPage() {
                   {isDark ? (
                     <>
                       <Sun className="size-4" />
-                      Switch to light
+                      Switch to light mode
                     </>
                   ) : (
                     <>
                       <Moon className="size-4" />
-                      Switch to dark
+                      Switch to dark mode
                     </>
                   )}
                 </Button>
@@ -181,43 +254,6 @@ export function SettingsPage() {
             </CardContent>
           </Card>
         </div>
-
-        <Card className="h-fit border-border/80">
-          <CardHeader className="border-b bg-muted/20">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <UserCircle className="size-4 text-muted-foreground" />
-              Account summary
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent className="space-y-4 p-4 sm:p-6">
-            <div>
-              <p className="text-xs text-muted-foreground">Name</p>
-              <p className="mt-1 text-sm font-medium">{user?.name || "-"}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Email</p>
-              <p className="mt-1 break-all text-sm font-medium">
-                {user?.email || "-"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Account type</p>
-              <p className="mt-1 text-sm font-medium">
-                {user?.isSuperAdmin ? "Super Admin" : "Standard User"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground">Status</p>
-              <p className="mt-1 text-sm font-medium">
-                {user?.status || "-"}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

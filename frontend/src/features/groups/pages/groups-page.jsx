@@ -1,22 +1,11 @@
-import {
-  Edit,
-  KeyRound,
-  MoreHorizontal,
-  Plus,
-  Search,
-  Trash2,
-  UserPlus,
-  UsersRound,
-} from "lucide-react";
+import { Plus, RotateCcw, Search } from "lucide-react";
 import { useMemo } from "react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
-import { EmptyState } from "@/components/common/empty-state";
 import { ErrorState } from "@/components/common/error-state";
 import { PageHeader } from "@/components/common/page-header";
 import { PaginationControls } from "@/components/common/pagination-controls";
-import { StatusBadge } from "@/components/common/status-badge";
-import { Badge } from "@/components/ui/badge";
+import { TableSkeleton } from "@/components/loaders/table-skeleton";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,13 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -39,10 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 
 import { GroupFormDialog } from "@/features/groups/components/group-form-dialog";
 import { GroupRolesDialog } from "@/features/groups/components/group-roles-dialog";
+import { GroupsTable } from "@/features/groups/components/groups-table";
 import { GroupUsersDialog } from "@/features/groups/components/group-users-dialog";
 import {
   useDeleteGroupMutation,
@@ -52,36 +34,6 @@ import { useGroupsStore } from "@/features/groups/store/groups.store";
 import { useDebounce } from "@/hooks/use-debounce";
 import { usePermissions } from "@/hooks/use-permissions";
 import { PERMISSIONS } from "@/lib/rbac/permissions";
-import { formatDateTime } from "@/lib/utils/format-date";
-
-function GroupsTableSkeleton() {
-  return (
-    <div className="divide-y">
-      {Array.from({ length: 7 }).map((_, index) => (
-        <div
-          key={`group-table-skeleton-${index}`}
-          className="grid min-w-[1120px] grid-cols-[1.2fr_1.5fr_120px_110px_110px_170px_64px] items-center gap-4 px-4 py-3"
-        >
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-3 w-24" />
-          </div>
-
-          <Skeleton className="h-4 w-72 max-w-full" />
-          <Skeleton className="h-6 w-16 rounded-full" />
-          <Skeleton className="h-5 w-14" />
-          <Skeleton className="h-5 w-14" />
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="ml-auto size-8 rounded-lg" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const getCount = (items) => {
-  return Array.isArray(items) ? items.length : 0;
-};
 
 export function GroupsPage() {
   const { can } = usePermissions();
@@ -90,12 +42,7 @@ export function GroupsPage() {
   const setFilters = useGroupsStore((state) => state.setFilters);
 
   const openCreateDialog = useGroupsStore((state) => state.openCreateDialog);
-  const openEditDialog = useGroupsStore((state) => state.openEditDialog);
-  const openUsersDialog = useGroupsStore((state) => state.openUsersDialog);
-  const openRolesDialog = useGroupsStore((state) => state.openRolesDialog);
-  const openDeleteDialog = useGroupsStore((state) => state.openDeleteDialog);
   const closeDeleteDialog = useGroupsStore((state) => state.closeDeleteDialog);
-
   const deleteDialogOpen = useGroupsStore((state) => state.deleteDialogOpen);
   const groupForDelete = useGroupsStore((state) => state.groupForDelete);
 
@@ -117,10 +64,17 @@ export function GroupsPage() {
       role: "all",
       page: filters.page,
       limit: filters.limit,
-      sortBy: "createdAt",
-      sortOrder: "desc",
+      sortBy: filters.sortBy || "createdAt",
+      sortOrder: filters.sortOrder || "desc",
     }),
-    [debouncedSearch, filters.limit, filters.page, filters.status]
+    [
+      debouncedSearch,
+      filters.limit,
+      filters.page,
+      filters.status,
+      filters.sortBy,
+      filters.sortOrder,
+    ]
   );
 
   const groupsQuery = useGroupsQuery(queryParams);
@@ -149,6 +103,16 @@ export function GroupsPage() {
     });
   };
 
+  const handleResetFilters = () => {
+    setFilters({
+      search: "",
+      status: "all",
+      page: 1,
+      sortBy: "createdAt",
+      sortOrder: "desc",
+    });
+  };
+
   const handleDeleteConfirm = () => {
     if (!groupForDelete?._id) {
       return;
@@ -157,11 +121,8 @@ export function GroupsPage() {
     deleteGroupMutation.mutate(groupForDelete._id);
   };
 
-  const hasAnyRowAction =
-    canUpdate || canManageUsers || canManageRoles || canDelete;
-
   return (
-    <div className="feature-page">
+    <div className="space-y-5">
       <PageHeader
         title="Groups"
         description="Manage cross-department access groups."
@@ -175,33 +136,29 @@ export function GroupsPage() {
         }
       />
 
-      <Card className="feature-card">
-        <CardHeader className="feature-card-header">
+      <Card className="overflow-hidden border-border/80">
+        <CardHeader className="border-b bg-muted/20 px-4 py-4 sm:px-5">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <UsersRound className="size-4 text-muted-foreground" />
-                Group directory
-              </CardTitle>
-
-              <p className="mt-1 table-description-text text-sm text-muted-foreground">
+              <CardTitle className="text-base">Group directory</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
                 Assign users and inherited roles from one place.
               </p>
             </div>
 
-            <div className="feature-toolbar">
-              <div className="feature-search">
-                <Search className="feature-search-icon" />
+            <div className="grid gap-2 sm:grid-cols-[1fr_160px_auto] xl:w-[620px]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={filters.search}
                   onChange={handleSearchChange}
                   placeholder="Search groups..."
-                  className="feature-search-input"
+                  className="h-10 pl-9"
                 />
               </div>
 
               <Select value={filters.status} onValueChange={handleStatusChange}>
-                <SelectTrigger className="feature-filter-trigger">
+                <SelectTrigger className="h-10">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
 
@@ -211,197 +168,55 @@ export function GroupsPage() {
                   <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResetFilters}
+                className="h-10"
+              >
+                <RotateCcw className="size-4" />
+                Reset
+              </Button>
             </div>
           </div>
         </CardHeader>
 
         <CardContent className="p-0">
           {groupsQuery.isLoading ? (
-            <div className="feature-table-wrap">
-              <GroupsTableSkeleton />
+            <div className="p-4">
+              <TableSkeleton rows={8} columns={7} />
             </div>
           ) : groupsQuery.isError ? (
-            <div className="p-4 sm:p-6">
-              <ErrorState description="Unable to load groups." />
-            </div>
-          ) : groups.length ? (
-            <>
-              <div className="feature-table-wrap">
-                <table className="feature-table min-w-[1120px]">
-                  <thead className="feature-table-head">
-                    <tr>
-                      <th className="feature-th">Group</th>
-                      <th className="feature-th">Description</th>
-                      <th className="feature-th">Status</th>
-                      <th className="feature-th">Users</th>
-                      <th className="feature-th">Roles</th>
-                      <th className="feature-th">Created</th>
-                      {hasAnyRowAction ? (
-                        <th className="feature-th w-16 text-right">Actions</th>
-                      ) : null}
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y">
-                    {groups.map((group) => (
-                      <tr
-                        key={group._id}
-                        className="transition-colors hover:bg-muted/30"
-                      >
-                        <td className="feature-td">
-                          <div className="min-w-0">
-                            <p className="table-primary-text font-medium">
-                              {group.name}
-                            </p>
-
-                            <p className="mt-1 table-code-text">
-                              {group.code}
-                            </p>
-                          </div>
-                        </td>
-
-                        <td className="feature-td">
-                          {group.description ? (
-                            <p className="table-description-text text-xs leading-5 text-muted-foreground">
-                              {group.description}
-                            </p>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              -
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="feature-td">
-                          <StatusBadge status={group.status} />
-                        </td>
-
-                        <td className="feature-td">
-                          <Badge
-                            variant="outline"
-                            className="rounded-md font-normal"
-                          >
-                            {getCount(group.users)}
-                          </Badge>
-                        </td>
-
-                        <td className="feature-td">
-                          <Badge
-                            variant="outline"
-                            className="rounded-md font-normal"
-                          >
-                            {getCount(group.roles)}
-                          </Badge>
-                        </td>
-
-                        <td className="feature-td text-sm text-muted-foreground">
-                          {formatDateTime(group.createdAt)}
-                        </td>
-
-                        {hasAnyRowAction ? (
-                          <td className="feature-td text-right">
-                            <DropdownMenu modal={false}>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-8"
-                                >
-                                  <MoreHorizontal className="size-4" />
-                                  <span className="sr-only">Open actions</span>
-                                </Button>
-                              </DropdownMenuTrigger>
-
-                              <DropdownMenuContent align="end" className="w-48">
-                                {canUpdate ? (
-                                  <DropdownMenuItem
-                                    onSelect={(event) => {
-                                      event.preventDefault();
-                                      openEditDialog(group);
-                                    }}
-                                  >
-                                    <Edit className="size-4" />
-                                    Edit group
-                                  </DropdownMenuItem>
-                                ) : null}
-
-                                {canManageUsers ? (
-                                  <DropdownMenuItem
-                                    onSelect={(event) => {
-                                      event.preventDefault();
-                                      openUsersDialog(group);
-                                    }}
-                                  >
-                                    <UserPlus className="size-4" />
-                                    Manage users
-                                  </DropdownMenuItem>
-                                ) : null}
-
-                                {canManageRoles ? (
-                                  <DropdownMenuItem
-                                    onSelect={(event) => {
-                                      event.preventDefault();
-                                      openRolesDialog(group);
-                                    }}
-                                  >
-                                    <KeyRound className="size-4" />
-                                    Manage roles
-                                  </DropdownMenuItem>
-                                ) : null}
-
-                                {canDelete ? (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      variant="destructive"
-                                      onSelect={(event) => {
-                                        event.preventDefault();
-                                        openDeleteDialog(group);
-                                      }}
-                                    >
-                                      <Trash2 className="size-4" />
-                                      Delete group
-                                    </DropdownMenuItem>
-                                  </>
-                                ) : null}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        ) : null}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <PaginationControls
-                pagination={pagination}
-                limit={filters.limit}
-                onPageChange={(nextPage) =>
-                  setFilters({
-                    page: nextPage,
-                  })
-                }
-                onLimitChange={handleLimitChange}
+            <div className="p-4">
+              <ErrorState
+                description="Unable to load groups."
+                onRetry={() => groupsQuery.refetch()}
               />
-            </>
+            </div>
           ) : (
-            <div className="p-4 sm:p-6">
-              <EmptyState
-                title="No groups found"
-                description="Create a group to assign users and inherited roles."
-                action={
-                  canCreate ? (
-                    <Button type="button" onClick={openCreateDialog}>
-                      <Plus className="size-4" />
-                      Create group
-                    </Button>
-                  ) : null
-                }
-              />
-            </div>
+            <GroupsTable
+              groups={groups}
+              canCreate={canCreate}
+              canUpdate={canUpdate}
+              canDelete={canDelete}
+              canManageUsers={canManageUsers}
+              canManageRoles={canManageRoles}
+            />
           )}
+
+          {!groupsQuery.isLoading && !groupsQuery.isError && groups.length ? (
+            <PaginationControls
+              pagination={pagination}
+              limit={filters.limit}
+              onPageChange={(nextPage) =>
+                setFilters({
+                  page: nextPage,
+                })
+              }
+              onLimitChange={handleLimitChange}
+            />
+          ) : null}
         </CardContent>
       </Card>
 

@@ -2,10 +2,7 @@ import { env } from "../../config/env.js";
 import { ApiResponse } from "../../utils/api-response.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 import { clearAuthCookies, setAuthCookies } from "../../utils/cookie-options.js";
-import {
-  findRefreshToken,
-  verifyAccessToken,
-} from "./token.service.js";
+import { findRefreshToken, verifyAccessToken } from "./token.service.js";
 import {
   forgotPasswordService,
   getAuthenticatedUser,
@@ -24,7 +21,7 @@ const getCurrentSessionUserIdFromRequest = async (req) => {
       const decoded = verifyAccessToken(accessToken);
       return decoded?.userId || null;
     } catch {
-      // Fall back to refresh token lookup below.
+      // Access token may be expired. Try refresh cookie below.
     }
   }
 
@@ -127,15 +124,13 @@ export const forgotPassword = asyncHandler(async (req, res) => {
       }
     : null;
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        responseData,
-        "If an active account exists with this email, a password reset link has been sent"
-      )
-    );
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      responseData,
+      "If an active account exists with this email, a password reset link has been sent"
+    )
+  );
 });
 
 export const resetPassword = asyncHandler(async (req, res) => {

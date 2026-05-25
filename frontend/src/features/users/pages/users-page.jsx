@@ -1,4 +1,4 @@
-import { Plus, Search } from "lucide-react";
+import { Plus, RotateCcw, Search } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { ErrorState } from "@/components/common/error-state";
@@ -48,6 +48,7 @@ export function UsersPage() {
   const setDepartment = useUsersStore((state) => state.setDepartment);
   const setPage = useUsersStore((state) => state.setPage);
   const setLimit = useUsersStore((state) => state.setLimit);
+  const resetFilters = useUsersStore((state) => state.resetFilters);
   const openCreateDialog = useUsersStore((state) => state.openCreateDialog);
   const closeDeleteDialog = useUsersStore((state) => state.closeDeleteDialog);
 
@@ -71,11 +72,15 @@ export function UsersPage() {
     deleteUserMutation.mutate(userToDelete._id);
   };
 
+  const handleResetFilters = () => {
+    resetFilters();
+  };
+
   return (
     <div className="space-y-5">
       <PageHeader
         title="Users"
-        description="Manage users, departments, roles, and account status."
+        description="Create, manage, and govern user access."
         actions={
           canCreate ? (
             <Button type="button" onClick={openCreateDialog}>
@@ -92,22 +97,31 @@ export function UsersPage() {
             <div className="min-w-0">
               <CardTitle className="text-base">User directory</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                View and manage application user access.
+                Search users and filter by status or department.
               </p>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-[1fr_150px_180px] xl:w-[680px]">
+            <div className="grid gap-2 sm:grid-cols-[1fr_150px_170px_auto] xl:w-[760px]">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
                   placeholder="Search users..."
                   className="h-10 pl-9"
                 />
               </div>
 
-              <Select value={status} onValueChange={setStatus}>
+              <Select
+                value={status}
+                onValueChange={(value) => {
+                  setStatus(value);
+                  setPage(1);
+                }}
+              >
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -120,7 +134,13 @@ export function UsersPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={department} onValueChange={setDepartment}>
+              <Select
+                value={department}
+                onValueChange={(value) => {
+                  setDepartment(value);
+                  setPage(1);
+                }}
+              >
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Department" />
                 </SelectTrigger>
@@ -134,6 +154,16 @@ export function UsersPage() {
                   ))}
                 </SelectContent>
               </Select>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResetFilters}
+                className="h-10"
+              >
+                <RotateCcw className="size-4" />
+                Reset
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -141,7 +171,7 @@ export function UsersPage() {
         <CardContent className="p-0">
           {usersQuery.isLoading ? (
             <div className="p-4">
-              <TableSkeleton rows={8} columns={5} />
+              <TableSkeleton rows={8} columns={7} />
             </div>
           ) : usersQuery.isError ? (
             <div className="p-4">
@@ -154,12 +184,15 @@ export function UsersPage() {
             <UsersTable users={users} />
           )}
 
-          {!usersQuery.isLoading && !usersQuery.isError ? (
+          {!usersQuery.isLoading && !usersQuery.isError && users.length ? (
             <PaginationControls
               pagination={pagination}
               limit={limit}
               onPageChange={setPage}
-              onLimitChange={setLimit}
+              onLimitChange={(nextLimit) => {
+                setLimit(nextLimit);
+                setPage(1);
+              }}
             />
           ) : null}
         </CardContent>
@@ -172,7 +205,11 @@ export function UsersPage() {
 
       <ConfirmDialog
         open={deleteDialogOpen}
-        onOpenChange={closeDeleteDialog}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            closeDeleteDialog();
+          }
+        }}
         title="Delete user?"
         description={
           userToDelete

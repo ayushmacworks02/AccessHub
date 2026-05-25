@@ -30,6 +30,11 @@ const columns = [
     sortable: true,
   },
   {
+    key: "description",
+    label: "Description",
+    sortable: false,
+  },
+  {
     key: "actor",
     label: "Actor",
     sortable: false,
@@ -58,6 +63,14 @@ const getActorLabel = (audit) => {
     return audit.actor.email;
   }
 
+  if (audit?.actorSnapshot?.name) {
+    return audit.actorSnapshot.name;
+  }
+
+  if (audit?.actorSnapshot?.email) {
+    return audit.actorSnapshot.email;
+  }
+
   if (audit?.actorName) {
     return audit.actorName;
   }
@@ -67,6 +80,10 @@ const getActorLabel = (audit) => {
   }
 
   return "System";
+};
+
+const getActorEmail = (audit) => {
+  return audit?.actor?.email || audit?.actorSnapshot?.email || "";
 };
 
 const getResourceLabel = (audit) => {
@@ -85,6 +102,7 @@ export function AuditsTable({ audits = [] }) {
         sortBy: columnKey,
         sortOrder: sortOrder === "asc" ? "desc" : "asc",
       });
+
       return;
     }
 
@@ -96,7 +114,7 @@ export function AuditsTable({ audits = [] }) {
 
   if (!audits.length) {
     return (
-      <div className="p-6">
+      <div className="feature-table-empty">
         <EmptyState
           title="No audit logs found"
           description="Audit events will appear here when users perform important actions."
@@ -106,19 +124,20 @@ export function AuditsTable({ audits = [] }) {
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[980px] text-left text-sm">
-        <thead className="border-b bg-background text-xs uppercase tracking-wide text-muted-foreground">
+    <div className="feature-table-wrap scrollbar-soft">
+      <table className="feature-table min-w-[1120px]">
+        <thead className="feature-table-head">
           <tr>
             {columns.map((column) => (
-              <th key={column.key} className="px-4 py-3 font-medium">
+              <th key={column.key} className="feature-th">
                 {column.sortable ? (
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
+                    className="table-sort-button"
                     onClick={() => handleSort(column.key)}
                   >
                     <span>{column.label}</span>
+
                     {sortBy === column.key ? (
                       sortOrder === "asc" ? (
                         <ArrowDownAZ className="size-3.5" />
@@ -133,20 +152,20 @@ export function AuditsTable({ audits = [] }) {
               </th>
             ))}
 
-            <th className="w-16 px-4 py-3 text-right font-medium">Actions</th>
+            <th className="feature-th table-action-cell">Actions</th>
           </tr>
         </thead>
 
-        <tbody className="divide-y">
+        <tbody>
           {audits.map((audit) => (
-            <tr key={audit._id} className="transition-colors hover:bg-muted/30">
-              <td className="px-4 py-3">
+            <tr key={audit._id}>
+              <td className="feature-td">
                 <Badge variant="outline" className="rounded-md capitalize">
                   {humanizeText(audit.action)}
                 </Badge>
               </td>
 
-              <td className="px-4 py-3">
+              <td className="feature-td">
                 <div className="flex min-w-0 items-start gap-2">
                   <ShieldCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 
@@ -155,43 +174,62 @@ export function AuditsTable({ audits = [] }) {
                       {humanizeText(getResourceLabel(audit))}
                     </p>
 
-                    {audit.resourceId || audit.entityId ? (
+                    {audit.entityId || audit.resourceId ? (
                       <p className="mt-1 table-secondary-text font-mono text-xs text-muted-foreground">
-                        {audit.resourceId || audit.entityId}
-                      </p>
-                    ) : null}
-
-                    {audit.description ? (
-                      <p className="mt-1 table-description-text text-xs leading-5 text-muted-foreground">
-                        {audit.description}
+                        {audit.entityId || audit.resourceId}
                       </p>
                     ) : null}
                   </div>
                 </div>
               </td>
 
-              <td className="px-4 py-3">
+              <td className="feature-td">
+                {audit.description ? (
+                  <p className="table-description-text text-xs leading-5 text-muted-foreground">
+                    {audit.description}
+                  </p>
+                ) : audit.errorMessage ? (
+                  <p className="table-description-text text-xs leading-5 text-destructive">
+                    {audit.errorMessage}
+                  </p>
+                ) : (
+                  <span className="text-xs text-muted-foreground">-</span>
+                )}
+              </td>
+
+              <td className="feature-td">
                 <div className="min-w-0">
                   <p className="table-primary-text font-medium">
                     {getActorLabel(audit)}
                   </p>
 
-                  {audit.ipAddress ? (
+                  {getActorEmail(audit) ? (
+                    <p className="mt-1 table-secondary-text text-xs text-muted-foreground">
+                      {getActorEmail(audit)}
+                    </p>
+                  ) : null}
+
+                  {audit.request?.ipAddress || audit.ipAddress ? (
                     <p className="mt-1 table-meta-text text-xs text-muted-foreground">
-                      {audit.ipAddress}
+                      {audit.request?.ipAddress || audit.ipAddress}
                     </p>
                   ) : null}
                 </div>
               </td>
 
-              <td className="px-4 py-3 text-sm text-muted-foreground">
+              <td className="feature-td text-sm text-muted-foreground">
                 {formatDateTime(audit.createdAt)}
               </td>
 
-              <td className="px-4 py-3 text-right">
+              <td className="feature-td table-action-cell">
                 <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild>
-                    <Button type="button" variant="ghost" size="icon" className="size-8">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                    >
                       <MoreHorizontal className="size-4" />
                       <span className="sr-only">Open actions</span>
                     </Button>

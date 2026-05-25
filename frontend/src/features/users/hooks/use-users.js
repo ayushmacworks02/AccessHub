@@ -87,6 +87,7 @@ export function useCreateUserMutation() {
 
   return useMutation({
     mutationFn: usersApi.createUser,
+
     onSuccess: (data) => {
       toast.success("User created successfully");
 
@@ -98,8 +99,10 @@ export function useCreateUserMutation() {
           description:
             "The credentials email was generated successfully. Open the preview link to verify the email content.",
           previewUrl: data.emailPreviewUrl,
-          messageId: data.emailMessageId,
+          messageId: data.emailMessageId || "",
           status: "success",
+          recoverable: false,
+          expiresAt: null,
         });
       }
 
@@ -107,6 +110,7 @@ export function useCreateUserMutation() {
         queryKey: USERS_QUERY_KEYS.all,
       });
     },
+
     onError: (error) => {
       toast.error(getApiErrorMessage(error, "Unable to create user"));
     },
@@ -120,6 +124,7 @@ export function useUpdateUserMutation() {
 
   return useMutation({
     mutationFn: usersApi.updateUser,
+
     onSuccess: () => {
       toast.success("User updated successfully");
 
@@ -129,6 +134,7 @@ export function useUpdateUserMutation() {
         queryKey: USERS_QUERY_KEYS.all,
       });
     },
+
     onError: (error) => {
       toast.error(getApiErrorMessage(error, "Unable to update user"));
     },
@@ -142,6 +148,7 @@ export function useUpdateUserStatusMutation() {
 
   return useMutation({
     mutationFn: usersApi.updateUserStatus,
+
     onSuccess: () => {
       toast.success("User status updated successfully");
 
@@ -151,6 +158,7 @@ export function useUpdateUserStatusMutation() {
         queryKey: USERS_QUERY_KEYS.all,
       });
     },
+
     onError: (error) => {
       toast.error(getApiErrorMessage(error, "Unable to update user status"));
     },
@@ -164,6 +172,7 @@ export function useAssignUserRolesMutation() {
 
   return useMutation({
     mutationFn: usersApi.assignUserRoles,
+
     onSuccess: () => {
       toast.success("User roles updated successfully");
 
@@ -173,6 +182,7 @@ export function useAssignUserRolesMutation() {
         queryKey: USERS_QUERY_KEYS.all,
       });
     },
+
     onError: (error) => {
       toast.error(getApiErrorMessage(error, "Unable to update user roles"));
     },
@@ -188,8 +198,53 @@ export function useSendUserPasswordResetMutation() {
     (state) => state.updateEmailPreviewDialog
   );
 
+  const startResetEmailRequest = useUsersStore(
+    (state) => state.startResetEmailRequest
+  );
+
+  const finishResetEmailRequest = useUsersStore(
+    (state) => state.finishResetEmailRequest
+  );
+
+  const activateResetEmailCooldown = useUsersStore(
+    (state) => state.activateResetEmailCooldown
+  );
+
+  const getDefaultResetLinkExpiresAt = useUsersStore(
+    (state) => state.getDefaultResetLinkExpiresAt
+  );
+
   return useMutation({
-    mutationFn: (userOrId) => usersApi.sendPasswordResetEmail(getUserId(userOrId)),
+    mutationFn: async (userOrId) => {
+      const userId = getUserId(userOrId);
+
+      if (!userId) {
+        throw new Error("Unable to send reset email. User ID is missing.");
+      }
+
+      const usersState = useUsersStore.getState();
+
+      const cooldownExpiresAt = usersState.resetEmailCooldownExpiresAt;
+      const cooldownActive =
+        cooldownExpiresAt &&
+        new Date(cooldownExpiresAt).getTime() > Date.now();
+
+      if (usersState.resetEmailRequestPending) {
+        throw new Error(
+          "A password reset email request is already in progress. Please wait for it to finish."
+        );
+      }
+
+      if (cooldownActive) {
+        throw new Error(
+          "A password reset email was already sent. Please wait until the current reset link expires."
+        );
+      }
+
+      startResetEmailRequest(userId);
+
+      return usersApi.sendPasswordResetEmail(userId);
+    },
 
     onMutate: (userOrId) => {
       openEmailPreviewDialog({
@@ -200,11 +255,22 @@ export function useSendUserPasswordResetMutation() {
         previewUrl: "",
         messageId: "",
         status: "sending",
+        recoverable: false,
+        expiresAt: null,
       });
     },
 
-    onSuccess: (data) => {
+    onSuccess: (data, userOrId) => {
+      const userId = getUserId(userOrId);
+      const resetLinkExpiresAt =
+        data?.resetLinkExpiresAt || getDefaultResetLinkExpiresAt();
+
       toast.success("Password reset email sent successfully");
+
+      activateResetEmailCooldown({
+        userId,
+        expiresAt: resetLinkExpiresAt,
+      });
 
       updateEmailPreviewDialog({
         title: "Password reset email sent",
@@ -213,6 +279,8 @@ export function useSendUserPasswordResetMutation() {
         previewUrl: data?.emailPreviewUrl || "",
         messageId: data?.emailMessageId || "",
         status: "success",
+        recoverable: Boolean(data?.emailPreviewUrl),
+        expiresAt: resetLinkExpiresAt,
       });
 
       queryClient.invalidateQueries({
@@ -221,7 +289,10 @@ export function useSendUserPasswordResetMutation() {
     },
 
     onError: (error) => {
-      const message = getApiErrorMessage(error, "Unable to send reset email");
+      const message = getApiErrorMessage(
+        error,
+        error?.message || "Unable to send reset email"
+      );
 
       toast.error(message);
 
@@ -231,7 +302,13 @@ export function useSendUserPasswordResetMutation() {
         previewUrl: "",
         messageId: "",
         status: "error",
+        recoverable: false,
+        expiresAt: null,
       });
+    },
+
+    onSettled: () => {
+      finishResetEmailRequest();
     },
   });
 }
@@ -241,6 +318,7 @@ export function useDeleteUserMutation() {
 
   return useMutation({
     mutationFn: usersApi.deleteUser,
+
     onSuccess: () => {
       toast.success("User deleted successfully");
 
@@ -250,6 +328,7 @@ export function useDeleteUserMutation() {
         queryKey: USERS_QUERY_KEYS.all,
       });
     },
+
     onError: (error) => {
       toast.error(getApiErrorMessage(error, "Unable to delete user"));
     },

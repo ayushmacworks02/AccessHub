@@ -1,13 +1,19 @@
-import { ShieldCheck } from "lucide-react";
-
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  AlertTriangle,
+  CalendarClock,
+  FileJson,
+  MonitorCog,
+  ShieldCheck,
+  UserCircle,
+} from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
+import { Dialog } from "@/components/ui/dialog";
+import {
+  AppDialogBody,
+  AppDialogContent,
+  AppDialogHeader,
+} from "@/components/common/app-dialog-shell";
 import { formatDateTime } from "@/lib/utils/format-date";
 import { useAuditsStore } from "@/features/audits/store/audits.store";
 
@@ -51,91 +57,167 @@ const getActorLabel = (audit) => {
   return "System";
 };
 
+const getActorSubLabel = (audit) => {
+  if (audit?.actor?.email && audit?.actor?.name) {
+    return audit.actor.email;
+  }
+
+  if (audit?.actorEmail && audit?.actorName) {
+    return audit.actorEmail;
+  }
+
+  return audit?.ipAddress || "No actor metadata";
+};
+
+const getResourceLabel = (audit) => {
+  return audit?.resource || audit?.module || audit?.entityType || "-";
+};
+
+const getResourceId = (audit) => {
+  return audit?.resourceId || audit?.entityId || audit?.targetId || "";
+};
+
+const getEventDescription = (audit) => {
+  return audit?.description || audit?.message || "No event description available.";
+};
+
+function DetailCard({ label, children, icon: Icon }) {
+  return (
+    <div className="dialog-detail-card">
+      <div className="flex items-start gap-3">
+        {Icon ? (
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+            <Icon className="size-4 text-muted-foreground" />
+          </div>
+        ) : null}
+
+        <div className="min-w-0 flex-1">
+          <p className="dialog-detail-label">{label}</p>
+          <div className="mt-2 min-w-0">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AuditDetailDialog() {
   const open = useAuditsStore((state) => state.detailDialogOpen);
   const audit = useAuditsStore((state) => state.selectedAudit);
   const closeDetailDialog = useAuditsStore((state) => state.closeDetailDialog);
 
+  const metadata = audit?.metadata || audit?.details || {};
+  const hasError = Boolean(audit?.errorMessage);
+
+  const handleOpenChange = (nextOpen) => {
+    if (!nextOpen) {
+      closeDetailDialog();
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={closeDetailDialog}>
-      <DialogContent className="max-h-[92svh] overflow-y-auto p-0 sm:max-w-3xl">
-        <DialogHeader className="border-b px-4 py-4 sm:px-6">
-          <div className="flex items-start gap-3 pr-8">
-            <div className="hidden size-9 shrink-0 items-center justify-center rounded-xl border bg-muted sm:flex">
-              <ShieldCheck className="size-4 text-muted-foreground" />
-            </div>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <AppDialogContent
+        size="wide"
+        className="flex max-h-[90svh] min-h-0 flex-col"
+      >
+        <AppDialogHeader
+          icon={ShieldCheck}
+          title="Audit details"
+          description="Review the selected administrative event."
+        />
 
-            <div className="space-y-1">
-              <DialogTitle>Audit details</DialogTitle>
-              <DialogDescription>
-                Review the selected administrative event.
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
-        {audit ? (
-          <div className="space-y-5 px-4 py-4 sm:px-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">Action</p>
-                <div className="mt-2">
-                  <Badge variant="outline" className="rounded-lg capitalize">
+        <AppDialogBody
+          scrollable
+          muted
+          className="max-h-[68svh] space-y-4 p-4 sm:p-5"
+        >
+          {audit ? (
+            <>
+              <div className="grid gap-3 md:grid-cols-2">
+                <DetailCard label="Action" icon={MonitorCog}>
+                  <Badge variant="outline" className="rounded-md capitalize">
                     {humanizeText(audit.action)}
                   </Badge>
+                </DetailCard>
+
+                <DetailCard label="Time" icon={CalendarClock}>
+                  <p className="table-secondary-text text-sm font-medium">
+                    {formatDateTime(audit.createdAt)}
+                  </p>
+                </DetailCard>
+
+                <DetailCard label="Resource" icon={ShieldCheck}>
+                  <p className="table-primary-text text-sm font-medium capitalize">
+                    {humanizeText(getResourceLabel(audit))}
+                  </p>
+
+                  {getResourceId(audit) ? (
+                    <p className="mt-1 table-secondary-text font-mono text-xs text-muted-foreground">
+                      {getResourceId(audit)}
+                    </p>
+                  ) : null}
+                </DetailCard>
+
+                <DetailCard label="Actor" icon={UserCircle}>
+                  <p className="table-primary-text text-sm font-medium">
+                    {getActorLabel(audit)}
+                  </p>
+
+                  <p className="mt-1 table-secondary-text text-xs text-muted-foreground">
+                    {getActorSubLabel(audit)}
+                  </p>
+                </DetailCard>
+              </div>
+
+              <DetailCard label="Description" icon={FileJson}>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {getEventDescription(audit)}
+                </p>
+              </DetailCard>
+
+              {hasError ? (
+                <DetailCard label="Error" icon={AlertTriangle}>
+                  <p className="text-sm leading-6 text-destructive">
+                    {audit.errorMessage}
+                  </p>
+                </DetailCard>
+              ) : null}
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <FileJson className="size-4 text-muted-foreground" />
+                  <p className="text-sm font-medium">Metadata</p>
                 </div>
+
+                <pre className="dialog-json-block scrollbar-soft">
+                  {formatJson(metadata)}
+                </pre>
               </div>
 
-              <div className="rounded-xl border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">Resource</p>
-                <p className="mt-2 text-sm font-medium capitalize">
-                  {humanizeText(audit.resource)}
-                </p>
-              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <FileJson className="size-4 text-muted-foreground" />
+                  <p className="text-sm font-medium">Raw audit payload</p>
+                </div>
 
-              <div className="rounded-xl border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">Actor</p>
-                <p className="mt-2 text-sm font-medium">
-                  {getActorLabel(audit)}
-                </p>
+                <pre className="dialog-json-block scrollbar-soft">
+                  {formatJson(audit)}
+                </pre>
               </div>
-
-              <div className="rounded-xl border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">Time</p>
-                <p className="mt-2 text-sm font-medium">
-                  {formatDateTime(audit.createdAt)}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">Resource ID</p>
-                <p className="mt-2 break-all font-mono text-xs">
-                  {audit.resourceId || "-"}
-                </p>
-              </div>
-
-              <div className="rounded-xl border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">IP Address</p>
-                <p className="mt-2 text-sm font-medium">
-                  {audit.ipAddress || "-"}
+            </>
+          ) : (
+            <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed bg-card p-6 text-center">
+              <div>
+                <ShieldCheck className="mx-auto size-8 text-muted-foreground" />
+                <p className="mt-3 text-sm font-medium">No audit selected</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Select an audit event from the table to view details.
                 </p>
               </div>
             </div>
-
-            <div className="rounded-xl border bg-muted/20">
-              <div className="border-b px-3 py-2">
-                <p className="text-sm font-medium">Metadata</p>
-              </div>
-
-              <pre className="scrollbar-soft max-h-80 overflow-auto p-3 text-xs leading-5">
-                {formatJson(audit.metadata || audit.details || audit.extra)}
-              </pre>
-            </div>
-          </div>
-        ) : null}
-      </DialogContent>
+          )}
+        </AppDialogBody>
+      </AppDialogContent>
     </Dialog>
   );
 }

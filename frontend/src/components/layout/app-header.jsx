@@ -1,39 +1,56 @@
-import { Moon, Sun } from "lucide-react";
+import { useMemo } from "react";
+import { useLocation } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useThemeStore } from "@/stores/theme.store";
+import { appNavigationRoutes } from "@/routes/routes";
+import { appConfig } from "@/config/app.config";
+
+const normalizePath = (path = "") => {
+  if (!path || path === "/") {
+    return "/";
+  }
+
+  return path.replace(/\/+$/, "");
+};
+
+const getActiveRoute = (pathname) => {
+  const currentPath = normalizePath(pathname);
+
+  return appNavigationRoutes.find((route) => {
+    const routePath = normalizePath(route.path);
+
+    return currentPath === routePath || currentPath.startsWith(`${routePath}/`);
+  });
+};
 
 export function AppHeader() {
-  const theme = useThemeStore((state) => state.theme);
-  const toggleTheme = useThemeStore((state) => state.toggleTheme);
+  const location = useLocation();
 
-  const isDark = theme === "dark";
+  const activeRoute = useMemo(
+    () => getActiveRoute(location.pathname),
+    [location.pathname]
+  );
+
+  const pageTitle = activeRoute?.title || appConfig.name;
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/90 px-4 backdrop-blur supports-backdrop-filter:bg-background/75">
-      <div className="flex min-w-0 items-center gap-3">
-        <SidebarTrigger className="size-9 rounded-xl border" />
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center border-b bg-background/92 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:px-5 lg:px-6">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <SidebarTrigger
+          className="inline-flex size-9 rounded-xl lg:hidden"
+          aria-label="Open sidebar"
+        />
 
         <div className="min-w-0">
-          <h1 className="truncate text-sm font-semibold sm:text-base">
-            Admin Console
-          </h1>
+          <p className="truncate text-sm font-medium text-foreground">
+            {pageTitle}
+          </p>
+
           <p className="hidden truncate text-xs text-muted-foreground sm:block">
-            Manage access, identities, and audit trails.
+            {appConfig.name}
           </p>
         </div>
       </div>
-
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        onClick={toggleTheme}
-        aria-label="Toggle theme"
-      >
-        {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-      </Button>
     </header>
   );
 }
