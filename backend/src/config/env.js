@@ -45,7 +45,7 @@ export const env = {
   accessTokenExpiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || "15m",
   refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || "7d",
 
-  cookieSecure: process.env.COOKIE_SECURE === "true" || isProduction,
+  cookieSecure: process.env.COOKIE_SECURE === "true",
   cookieSameSite: process.env.COOKIE_SAME_SITE || "lax",
 
   superAdminName: process.env.SUPER_ADMIN_NAME || "Super Admin",

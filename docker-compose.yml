@@ -1,0 +1,68 @@
+services:
+
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb
+
+    restart: unless-stopped
+
+    volumes:
+      - mongodb_data:/data/db
+
+    networks:
+      - accesshub
+
+  backend:
+    build: ./backend
+
+    container_name: accesshub-backend
+
+    restart: unless-stopped
+
+    env_file:
+      - ./backend/.env
+
+    depends_on:
+      - mongodb
+
+    networks:
+      - accesshub
+
+  frontend:
+    build: ./frontend
+
+    container_name: accesshub-frontend
+
+    restart: unless-stopped
+
+    depends_on:
+      - backend
+
+    networks:
+      - accesshub
+
+  nginx:
+    image: nginx:alpine
+
+    container_name: accesshub-nginx
+
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+
+    depends_on:
+      - frontend
+      - backend
+
+    networks:
+      - accesshub
+
+volumes:
+  mongodb_data:
+
+networks:
+  accesshub:
