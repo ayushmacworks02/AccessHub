@@ -4,6 +4,7 @@ import helmet from "helmet";
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
+import client from "prom-client";
 
 import { env } from "./config/env.js";
 import { globalRateLimiter } from "./middleware/rate-limit.middleware.js";
@@ -20,7 +21,11 @@ import userRoutes from "./modules/users/user.routes.js";
 import auditRoutes from "./modules/audits/audit.routes.js";
 
 const app = express();
+const register = new client.Registry();
 
+client.collectDefaultMetrics({
+  register,
+});
 app.set("trust proxy", 1);
 
 app.use(
@@ -66,6 +71,10 @@ app.get("/", (_req, res) => {
     success: true,
     message: "NxAuth backend is running",
   });
+});
+app.get("/metrics", async (_req, res) => {
+  res.set("Content-Type", register.contentType);
+  res.end(await register.metrics());
 });
 
 app.use("/api/health", healthRoutes);
